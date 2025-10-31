@@ -281,18 +281,44 @@ Text to summarize:
 IMPORTANT: The page language is ${languageName} (${pageLanguage}). Please provide the summary in ${languageName}.`;
 
               let fullResponse = '';
-              for await (const chunk of streamPromptResponse(prompt)) {
+              for await (const chunk of streamPromptResponse(prompt, undefined, {
+                outputLanguage: pageLanguage,
+              })) {
                 fullResponse += chunk;
                 setResponse(fullResponse);
               }
             } else {
-              const summary = await summarizeText(selectedText, {
-                type: 'tldr',
-                format: 'plain-text',
-                length: 'medium',
-                outputLanguage: pageLanguage,
-              });
-              setResponse(summary);
+              try {
+                const summary = await summarizeText(selectedText, {
+                  type: 'tldr',
+                  format: 'plain-text',
+                  length: 'medium',
+                  outputLanguage: pageLanguage,
+                });
+                setResponse(summary);
+              } catch (err: unknown) {
+                const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+                // If Summarizer API fails due to language, fallback to Prompt API
+                if (errorMessage.includes('language') || errorMessage.includes('not supported')) {
+                  console.warn('[A11y Extension] Summarizer API language not supported, using Prompt API fallback');
+                  const prompt = `Summarize the following text in a clear, concise way.
+
+Text to summarize:
+"${selectedText}"
+
+IMPORTANT: The page language is ${languageName} (${pageLanguage}). Please provide the summary in ${languageName}.`;
+
+                  let fullResponse = '';
+                  for await (const chunk of streamPromptResponse(prompt, undefined, {
+                    outputLanguage: pageLanguage,
+                  })) {
+                    fullResponse += chunk;
+                    setResponse(fullResponse);
+                  }
+                } else {
+                  throw err;
+                }
+              }
             }
             break;
           }
@@ -311,19 +337,41 @@ Text to simplify:
 IMPORTANT: The page language is ${languageName} (${pageLanguage}). Please provide the simplified text in ${languageName}.`;
 
               let fullResponse = '';
-              for await (const chunk of streamPromptResponse(prompt)) {
+              for await (const chunk of streamPromptResponse(prompt, undefined, {
+                outputLanguage: pageLanguage,
+              })) {
                 fullResponse += chunk;
                 setResponse(fullResponse);
               }
             } else {
-              let fullResponse = '';
-              for await (const chunk of simplifyText(selectedText, {
-                tone: 'friendly',
-                length: 'as-is',
-                format: 'as-is',
-              })) {
-                fullResponse = chunk;
-                setResponse(fullResponse);
+              try {
+                let fullResponse = '';
+                for await (const chunk of simplifyText(selectedText, {
+                  tone: 'friendly',
+                  length: 'as-is',
+                  format: 'as-is',
+                })) {
+                  fullResponse += chunk; // Accumulate chunks, don't overwrite
+                  setResponse(fullResponse);
+                }
+              } catch (err: unknown) {
+                const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+                // If Rewriter API fails, fallback to Prompt API
+                console.warn('[A11y Extension] Rewriter API failed, using Prompt API fallback:', errorMessage);
+                const prompt = `Rewrite the following text in simpler, more accessible language that's easier to understand. Keep the meaning the same but use plain language.
+
+Text to simplify:
+"${selectedText}"
+
+IMPORTANT: The page language is ${languageName} (${pageLanguage}). Please provide the simplified text in ${languageName}.`;
+
+                let fullResponse = '';
+                for await (const chunk of streamPromptResponse(prompt, undefined, {
+                  outputLanguage: pageLanguage,
+                })) {
+                  fullResponse += chunk;
+                  setResponse(fullResponse);
+                }
               }
             }
             break;
@@ -428,7 +476,9 @@ IMPORTANT: The page language is ${languageName} (${pageLanguage}). Please respon
 Please provide a helpful answer that considers the selected text and page context.`;
 
       let fullResponse = '';
-      for await (const chunk of streamPromptResponse(prompt)) {
+      for await (const chunk of streamPromptResponse(prompt, undefined, {
+        outputLanguage: pageLanguage,
+      })) {
         fullResponse += chunk;
         setResponse(fullResponse);
       }
@@ -503,16 +553,16 @@ Please provide a helpful answer that considers the selected text and page contex
           </button>
           <button
             onClick={e => handleAction('summarize', e)}
-            disabled={isLoading || !aiSupport?.hasSummarizer}
+            disabled={isLoading}
             className="rounded px-3 py-1.5 text-sm font-medium text-purple-600 transition-colors hover:bg-purple-50 disabled:opacity-50"
-            title="Summarize this text">
+            title="Summarize this text (uses Prompt API if Summarizer not available)">
             Summarize
           </button>
           <button
             onClick={e => handleAction('simplify', e)}
-            disabled={isLoading || !aiSupport?.hasRewriter}
+            disabled={isLoading}
             className="rounded px-3 py-1.5 text-sm font-medium text-green-600 transition-colors hover:bg-green-50 disabled:opacity-50"
-            title="Simplify this text">
+            title="Simplify this text (uses Prompt API if Rewriter not available)">
             Simplify
           </button>
           <button

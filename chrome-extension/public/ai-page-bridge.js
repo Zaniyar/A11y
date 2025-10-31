@@ -74,7 +74,11 @@
             throw new Error('Session not found');
           }
 
-          const stream = await session.promptStreaming(params.prompt);
+          // Include outputLanguage if provided (required for LanguageModel API)
+          // The promptStreaming API accepts: promptStreaming(prompt, { outputLanguage })
+          const stream = params.outputLanguage
+            ? await session.promptStreaming(params.prompt, { outputLanguage: params.outputLanguage })
+            : await session.promptStreaming(params.prompt);
           let previousChunk = '';
 
           for await (const chunk of stream) {

@@ -133,7 +133,7 @@ const sendStreamingMessageToPageScript = async function* (
 /**
  * Check if Chrome Built-in AI APIs are available
  */
-export const checkAISupport = async () => {
+const checkAISupport = async () => {
   try {
     const availability = await sendMessageToPageScript<{
       LanguageModel: boolean;
@@ -168,21 +168,42 @@ export const checkAISupport = async () => {
 /**
  * Create a LanguageModel session for Prompt API
  */
-export const createLanguageModel = async (options?: {
+const createLanguageModel = async (options?: {
   temperature?: number;
   topK?: number;
   initialPrompts?: Array<{ role: string; content: string }>;
 }): Promise<{ sessionId: number }> => sendMessageToPageScript('createLanguageModel', options || {});
 
 /**
+ * Map language code to LanguageModel API supported language
+ * The LanguageModel API only supports: en, es, ja
+ */
+const getSupportedLanguageModelLanguage = (langCode: string): string => {
+  const supportedLanguages = ['en', 'es', 'ja'];
+  const lang = langCode.toLowerCase().split('-')[0]; // Extract base language code
+
+  // If the language is directly supported, return it
+  if (supportedLanguages.includes(lang)) {
+    return lang;
+  }
+
+  // Default to English if not supported
+  return 'en';
+};
+
+/**
  * Stream prompt response using Prompt API
  */
-export const streamPromptResponse = async function* (
+const streamPromptResponse = async function* (
   prompt: string,
   systemPrompt?: string,
-  options?: { temperature?: number; topK?: number },
+  options?: { temperature?: number; topK?: number; outputLanguage?: string },
 ): AsyncGenerator<string, void, unknown> {
   try {
+    // Determine output language - use provided or detect from page
+    const requestedLang = options?.outputLanguage || getPageLanguage();
+    const outputLang = getSupportedLanguageModelLanguage(requestedLang);
+
     const { sessionId } = await createLanguageModel({
       temperature: options?.temperature,
       topK: options?.topK,
@@ -192,6 +213,7 @@ export const streamPromptResponse = async function* (
     yield* sendStreamingMessageToPageScript('promptStreaming', {
       sessionId,
       prompt,
+      outputLanguage: outputLang,
     });
 
     // Cleanup session after streaming is done
@@ -203,9 +225,26 @@ export const streamPromptResponse = async function* (
 };
 
 /**
+ * Map language code to Summarizer API supported language
+ * The Summarizer API only supports: en, es, ja
+ */
+const getSupportedSummarizerLanguage = (langCode: string): string => {
+  const supportedLanguages = ['en', 'es', 'ja'];
+  const lang = langCode.toLowerCase().split('-')[0]; // Extract base language code
+
+  // If the language is directly supported, return it
+  if (supportedLanguages.includes(lang)) {
+    return lang;
+  }
+
+  // Default to English if not supported
+  return 'en';
+};
+
+/**
  * Summarize text using Summarizer API
  */
-export const summarizeText = async (
+const summarizeText = async (
   text: string,
   options?: {
     type?: 'tldr' | 'explain' | 'define';
@@ -214,9 +253,10 @@ export const summarizeText = async (
     outputLanguage?: string;
   },
 ): Promise<string> => {
-  // Get page language or default to English
-  const pageLang = document.documentElement.lang || 'en';
-  const outputLang = options?.outputLanguage || (['en', 'es', 'ja'].includes(pageLang) ? pageLang : 'en');
+  // Get page language or use provided outputLanguage
+  const requestedLang = options?.outputLanguage || getPageLanguage();
+  // Map to supported Summarizer API language
+  const outputLang = getSupportedSummarizerLanguage(requestedLang);
 
   return sendMessageToPageScript('summarize', {
     text,
@@ -230,7 +270,7 @@ export const summarizeText = async (
 /**
  * Simplify/rewrite text using Rewriter API
  */
-export const simplifyText = async function* (
+const simplifyText = async function* (
   text: string,
   options?: {
     tone?: 'professional' | 'casual' | 'friendly' | 'as-is';
@@ -249,7 +289,7 @@ export const simplifyText = async function* (
 /**
  * Detect language of text
  */
-export const detectLanguage = async (
+const detectLanguage = async (
   text: string,
 ): Promise<{
   detectedLanguage: string;
@@ -259,7 +299,7 @@ export const detectLanguage = async (
 /**
  * Translate text using Translator API
  */
-export const translateText = async (text: string, targetLanguage: string, sourceLanguage?: string): Promise<string> => {
+const translateText = async (text: string, targetLanguage: string, sourceLanguage?: string): Promise<string> => {
   try {
     // Auto-detect source language if not provided
     let detectedSourceLanguage = sourceLanguage;
@@ -286,7 +326,7 @@ export const translateText = async (text: string, targetLanguage: string, source
 /**
  * Get page language from HTML lang attribute
  */
-export const getPageLanguage = (): string => {
+const getPageLanguage = (): string => {
   // Try documentElement.lang first (most common)
   const lang = document.documentElement.lang || document.documentElement.getAttribute('lang');
 
@@ -311,7 +351,7 @@ export const getPageLanguage = (): string => {
 /**
  * Get page context (for AI prompts)
  */
-export const getPageContext = (): string => {
+const getPageContext = (): string => {
   const title = document.title;
   const url = window.location.href;
   const language = getPageLanguage();
@@ -322,6 +362,19 @@ export const getPageContext = (): string => {
     .join(' | ');
 
   return `Page: ${title}\nURL: ${url}\nLanguage: ${language}\nMain headings: ${headings || 'N/A'}`;
+};
+
+// Export all functions at the end
+export {
+  checkAISupport,
+  createLanguageModel,
+  streamPromptResponse,
+  summarizeText,
+  simplifyText,
+  detectLanguage,
+  translateText,
+  getPageLanguage,
+  getPageContext,
 };
 
 export interface AIResponse {
