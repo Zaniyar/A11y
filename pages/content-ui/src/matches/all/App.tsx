@@ -134,6 +134,7 @@ export default function App() {
   const [followUpInput, setFollowUpInput] = useState<string>('');
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isEyeControl, setIsEyeControl] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [draggedPosition, setDraggedPosition] = useState<{ x: number; y: number } | null>(null);
@@ -143,6 +144,17 @@ export default function App() {
   const showResponseRef = useRef(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const synthesisRef = useRef<SpeechSynthesis | null>(null);
+  const trackyMouseRef = useRef<{ dispose: () => void } | null>(null);
+
+  // Cleanup Tracky Mouse on unmount
+  useEffect(() => {
+    return () => {
+      if (trackyMouseRef.current) {
+        trackyMouseRef.current.dispose();
+        trackyMouseRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     // Inject Origin Trial token if not already present
@@ -754,6 +766,254 @@ IMPORTANT:
   );
 
   /**
+   * Handle eye control (Tracky Mouse) - enable/disable head tracking
+   */
+  const handleEyeControl = useCallback(async () => {
+    if (isEyeControl) {
+      // Disable eye control
+      if (trackyMouseRef.current) {
+        trackyMouseRef.current.dispose();
+        trackyMouseRef.current = null;
+      }
+      setIsEyeControl(false);
+      return;
+    }
+
+    // Enable eye control
+    try {
+      // Load Tracky Mouse dynamically
+      const loadTrackyMouse = async () => {
+        // Inject bridge script into page context (similar to ai-page-bridge.js)
+        const bridgeScript = document.createElement('script');
+        bridgeScript.setAttribute('data-tracky-mouse-bridge', 'true');
+        bridgeScript.src = chrome.runtime.getURL('tracky-mouse-bridge.js');
+
+        return new Promise((resolve, reject) => {
+          const handleLoaded = () => {
+            window.removeEventListener('trackymouse-loaded', handleLoaded);
+            window.removeEventListener('trackymouse-error', handleError);
+            
+            // Return a wrapper that calls TrackyMouse methods via injected scripts
+            resolve({
+              loadDependencies: () => {
+                // Listen for dependency loading events from bridge script
+                return new Promise((res, rej) => {
+                  const timeout = setTimeout(() => {
+                    window.removeEventListener('trackymouse-deps-loaded', depsLoaded);
+                    window.removeEventListener('trackymouse-deps-error', depsError);
+                    rej(new Error('Timeout loading dependencies'));
+                  }, 30000);
+
+                  const depsLoaded = () => {
+                    clearTimeout(timeout);
+                    window.removeEventListener('trackymouse-deps-loaded', depsLoaded);
+                    window.removeEventListener('trackymouse-deps-error', depsError);
+                    res(undefined);
+                  };
+
+                  const depsError = (event: any) => {
+                    clearTimeout(timeout);
+                    window.removeEventListener('trackymouse-deps-loaded', depsLoaded);
+                    window.removeEventListener('trackymouse-deps-error', depsError);
+                    rej(new Error(event.detail || 'Failed to load dependencies'));
+                  };
+
+                  window.addEventListener('trackymouse-deps-loaded', depsLoaded, { once: true });
+                  window.addEventListener('trackymouse-deps-error', depsError, { once: true });
+
+                  // Trigger dependency loading via postMessage
+                  window.postMessage(
+                    {
+                      source: 'ai-content-script',
+                      type: 'trackymouse-load-dependencies',
+                    },
+                    '*',
+                  );
+                });
+              },
+              init: () => {
+                // Listen for init event from bridge script
+                return new Promise((resolve) => {
+                  const handleInit = () => {
+                    window.removeEventListener('trackymouse-init-complete', handleInit);
+                    resolve({
+                      dispose: () => {
+                        window.postMessage(
+                          {
+                            source: 'ai-content-script',
+                            type: 'trackymouse-dispose',
+                          },
+                          '*',
+                        );
+                      },
+                    });
+                  };
+                  window.addEventListener('trackymouse-init-complete', handleInit, { once: true });
+
+                  // Trigger init via postMessage
+                  window.postMessage(
+                    {
+                      source: 'ai-content-script',
+                      type: 'trackymouse-init',
+                    },
+                    '*',
+                  );
+                });
+              },
+              initDwellClicking: (config: any) => {
+                // Use postMessage to initialize (avoids CSP issues)
+                return new Promise((resolve, reject) => {
+                  const handleResponse = (event: MessageEvent) => {
+                    if (event.source !== window || event.data?.source !== 'ai-page-script') {
+                      return;
+                    }
+
+                    if (event.data.type === 'trackymouse-dwell-clicking-init') {
+                      window.removeEventListener('message', handleResponse);
+                      if (event.data.success) {
+                        resolve({
+                          dispose: () => {
+                            window.postMessage(
+                              {
+                                source: 'ai-content-script',
+                                type: 'trackymouse-dispose-dwell-clicking',
+                              },
+                              '*',
+                            );
+                          },
+                        });
+                      } else {
+                        reject(new Error(event.data.error || 'Failed to initialize dwell clicking'));
+                      }
+                    }
+                  };
+
+                  window.addEventListener('message', handleResponse);
+
+                  window.postMessage(
+                    {
+                      source: 'ai-content-script',
+                      type: 'trackymouse-init-dwell-clicking',
+                      config: config,
+                    },
+                    '*',
+                  );
+
+                  setTimeout(() => {
+                    window.removeEventListener('message', handleResponse);
+                    reject(new Error('Timeout initializing dwell clicking'));
+                  }, 10000);
+                });
+              },
+              onPointerMove: null as ((x: number, y: number) => void) | null,
+              useCamera: async () => {
+                // Use postMessage to call useCamera (avoids CSP issues)
+                window.postMessage(
+                  {
+                    source: 'ai-content-script',
+                    type: 'trackymouse-use-camera',
+                  },
+                  '*',
+                );
+              },
+            } as any);
+          };
+
+          const handleError = (event: any) => {
+            window.removeEventListener('trackymouse-loaded', handleLoaded);
+            window.removeEventListener('trackymouse-error', handleError);
+            reject(new Error(event.detail || 'Failed to load TrackyMouse'));
+          };
+
+          window.addEventListener('trackymouse-loaded', handleLoaded, { once: true });
+          window.addEventListener('trackymouse-error', handleError, { once: true });
+
+          bridgeScript.onload = () => {
+            console.log('[A11y Extension] Tracky Mouse bridge script loaded');
+          };
+          bridgeScript.onerror = () => {
+            window.removeEventListener('trackymouse-loaded', handleLoaded);
+            window.removeEventListener('trackymouse-error', handleError);
+            reject(new Error('Failed to load Tracky Mouse bridge script'));
+          };
+
+          // Check if already injected
+          const existingBridge = document.querySelector('script[data-tracky-mouse-bridge="true"]');
+          if (existingBridge) {
+            // Already injected, dispatch a check event to see if TrackyMouse is ready
+            // The bridge script listens for this event and will emit 'trackymouse-loaded' if ready
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent('check-trackymouse-status'));
+            }, 500);
+            // Continue to listen for loaded/error events
+          } else {
+            // Inject bridge script into page context
+            (document.head || document.documentElement).appendChild(bridgeScript);
+          }
+        });
+      };
+
+      const TrackyMouse = await loadTrackyMouse() as any;
+
+      // Load dependencies for head tracking
+      await TrackyMouse.loadDependencies();
+
+      // Initialize head tracking
+      const trackyMouse = TrackyMouse.init();
+
+      // Set up pointer move simulation
+      const getEventOptions = ({ x, y }: { x: number; y: number }) => {
+        return {
+          view: window,
+          clientX: x,
+          clientY: y,
+          pointerId: 1234567890,
+          pointerType: 'mouse' as const,
+          isPrimary: true,
+        };
+      };
+
+      // Initialize dwell clicking for interactive elements
+      // Use postMessage to communicate with page context (no inline scripts needed)
+      const dwellClickerConfig = {
+        dwellTime: 1000,
+        targets: `
+          button:not([disabled]),
+          input:not([disabled]),
+          textarea:not([disabled]),
+          label,
+          a,
+          select:not([disabled]),
+          [role="button"]:not([disabled]),
+          [role="link"]:not([disabled])
+        `,
+        // Note: click callback removed - can't be sent via postMessage
+        // The bridge script will handle clicking internally
+      };
+
+      // Initialize dwell clicking via postMessage (avoids CSP inline script issues)
+      const dwellClicker = await TrackyMouse.initDwellClicking(dwellClickerConfig);
+
+      trackyMouseRef.current = {
+        dispose: () => {
+          trackyMouse.dispose();
+          dwellClicker.dispose();
+          setIsEyeControl(false);
+        },
+      };
+
+      // Request camera access via postMessage
+      await TrackyMouse.useCamera();
+
+      setIsEyeControl(true);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to initialize eye control';
+      setError(errorMessage);
+      console.error('[A11y Extension] Eye control error:', err);
+    }
+  }, [isEyeControl]);
+
+  /**
    * Handle voice control - start listening for user question
    */
   const handleVoiceControl = useCallback(() => {
@@ -1048,6 +1308,27 @@ Please provide a helpful answer that considers the selected text and page contex
             }`}
             title={isListening ? 'Listening... Click to stop' : 'Voice control - Ask questions about the page'}>
             {isListening ? '🎤 Listening...' : '🎤 Voice'}
+          </button>
+          <button
+            onClick={e => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (typeof e.stopImmediatePropagation === 'function') {
+                e.stopImmediatePropagation();
+              }
+              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
+                e.nativeEvent.stopImmediatePropagation();
+              }
+              handleEyeControl();
+            }}
+            disabled={isLoading}
+            className={`rounded px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50 ${
+              isEyeControl
+                ? 'animate-pulse bg-green-600 text-white hover:bg-green-700'
+                : 'text-teal-600 hover:bg-teal-50'
+            }`}
+            title={isEyeControl ? 'Eye control active... Click to stop' : 'Eye control - Control mouse with head movement (hands-free)'}>
+            {isEyeControl ? '📹 Active...' : '📹 Camera'}
           </button>
         </div>
       )}
