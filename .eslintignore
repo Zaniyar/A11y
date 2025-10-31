@@ -1,0 +1,16 @@
+# Third-party libraries
+chrome-extension/public/tracky-mouse/
+
+# Node modules
+node_modules/
+**/node_modules/
+
+# Build output
+dist/
+build/
+
+# Package lock files
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
