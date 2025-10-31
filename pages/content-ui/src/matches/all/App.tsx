@@ -9,6 +9,7 @@ import {
 } from './ai-services';
 import { injectPageScript } from './inject-page-script';
 import { useEffect, useState, useRef, useCallback } from 'react';
+import ReactMarkdown from 'react-markdown';
 
 // Origin Trial Token for Chrome Built-in AI
 const ORIGIN_TRIAL_TOKEN =
@@ -133,6 +134,9 @@ export default function App() {
   const [followUpInput, setFollowUpInput] = useState<string>('');
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [draggedPosition, setDraggedPosition] = useState<{ x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const responseRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -885,12 +889,85 @@ Please provide a helpful answer that considers the selected text and page contex
     }
   }, [chatMessages, response]);
 
+  // Handle drag start
+  const handleDragStart = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    // Don't start drag if clicking on interactive elements
+    const target = e.target as HTMLElement;
+    if (
+      target.tagName === 'BUTTON' ||
+      target.tagName === 'SELECT' ||
+      target.closest('button') ||
+      target.closest('select')
+    ) {
+      return;
+    }
+
+    if (!responseRef.current) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const rect = responseRef.current.getBoundingClientRect();
+    setDragOffset({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    });
+    setIsDragging(true);
+  }, []);
+
+  // Handle drag
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!responseRef.current) return;
+
+      const newX = e.clientX - dragOffset.x;
+      const newY = e.clientY - dragOffset.y;
+
+      // Keep within viewport bounds
+      const rect = responseRef.current.getBoundingClientRect();
+      const maxX = window.innerWidth - rect.width;
+      const maxY = window.innerHeight - rect.height;
+
+      const clampedX = Math.max(0, Math.min(newX, maxX));
+      const clampedY = Math.max(0, Math.min(newY, maxY));
+
+      setDraggedPosition({ x: clampedX, y: clampedY });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, dragOffset]);
+
+  // Reset dragged position when response is closed
+  useEffect(() => {
+    if (!showResponse) {
+      setDraggedPosition(null);
+      setIsDragging(false);
+    }
+  }, [showResponse]);
+
   // Calculate response box position
   const responsePosition = showResponse
-    ? {
-        top: `${Math.min(position.y + 40, window.innerHeight - 400)}px`,
-        left: `${Math.min(Math.max(position.x - 200, 20), window.innerWidth - 420)}px`,
-      }
+    ? draggedPosition
+      ? {
+          top: `${draggedPosition.y}px`,
+          left: `${draggedPosition.x}px`,
+        }
+      : {
+          top: `${Math.min(position.y + 40, window.innerHeight - 400)}px`,
+          left: `${Math.min(Math.max(position.x - 200, 20), window.innerWidth - 420)}px`,
+        }
     : {};
 
   return (
@@ -983,8 +1060,16 @@ Please provide a helpful answer that considers the selected text and page contex
           style={responsePosition}
           role="dialog"
           aria-label="AI Response">
-          {/* Header */}
-          <div className="flex items-center justify-between rounded-t-lg border-b border-gray-200 bg-gray-50 p-3">
+          {/* Header - draggable */}
+          <div
+            onMouseDown={handleDragStart}
+            role="button"
+            tabIndex={0}
+            className={`flex cursor-move items-center justify-between rounded-t-lg border-b border-gray-200 bg-gray-50 p-3 ${
+              isDragging ? 'bg-gray-100' : ''
+            }`}
+            style={{ userSelect: 'none' }}
+            aria-label="Drag to move dialog">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-gray-700">
                 {activeAction === 'ask' && (isSpeaking ? '🔊 Speaking...' : '💬 Quick Ask')}
@@ -1076,7 +1161,54 @@ Please provide a helpful answer that considers the selected text and page contex
                     <div className="mb-1 text-xs font-semibold text-gray-500">
                       {msg.role === 'user' ? 'You' : 'AI Assistant'}
                     </div>
-                    <div className="whitespace-pre-wrap text-sm leading-relaxed text-gray-800">{msg.content}</div>
+                    <div className="prose prose-sm max-w-none text-gray-800">
+                      <ReactMarkdown
+                        components={{
+                          p: ({ ...props }) => <p className="mb-2 last:mb-0" {...props} />,
+                          strong: ({ ...props }) => <strong className="font-semibold" {...props} />,
+                          em: ({ ...props }) => <em className="italic" {...props} />,
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          code: (props: any) => {
+                            const isInline =
+                              !props.className ||
+                              typeof props.className !== 'string' ||
+                              !props.className.includes('language-');
+                            return isInline ? (
+                              <code className="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs" {...props} />
+                            ) : (
+                              <code className="block rounded bg-gray-100 p-2 font-mono text-xs" {...props} />
+                            );
+                          },
+                          ul: ({ ...props }) => <ul className="my-2 ml-4 list-disc space-y-1" {...props} />,
+                          ol: ({ ...props }) => <ol className="my-2 ml-4 list-decimal space-y-1" {...props} />,
+                          li: ({ ...props }) => <li className="text-sm" {...props} />,
+                          h1: ({ children, ...props }) => (
+                            <h1 className="mb-2 mt-3 text-lg font-bold" {...props}>
+                              {children}
+                            </h1>
+                          ),
+                          h2: ({ children, ...props }) => (
+                            <h2 className="mb-2 mt-3 text-base font-bold" {...props}>
+                              {children}
+                            </h2>
+                          ),
+                          h3: ({ children, ...props }) => (
+                            <h3 className="mb-1 mt-2 text-sm font-semibold" {...props}>
+                              {children}
+                            </h3>
+                          ),
+                          blockquote: ({ ...props }) => (
+                            <blockquote className="my-2 border-l-4 border-gray-300 pl-3 italic" {...props} />
+                          ),
+                          a: ({ children, ...props }) => (
+                            <a className="text-blue-600 underline hover:text-blue-800" {...props}>
+                              {children}
+                            </a>
+                          ),
+                        }}>
+                        {msg.content}
+                      </ReactMarkdown>
+                    </div>
                   </div>
                 ))}
 
@@ -1084,7 +1216,54 @@ Please provide a helpful answer that considers the selected text and page contex
                 {isLoading && response && (
                   <div className="mr-8 rounded-lg border border-gray-200 bg-gray-50 p-3">
                     <div className="mb-1 text-xs font-semibold text-gray-500">AI Assistant</div>
-                    <div className="whitespace-pre-wrap text-sm leading-relaxed text-gray-800">{response}</div>
+                    <div className="prose prose-sm max-w-none text-gray-800">
+                      <ReactMarkdown
+                        components={{
+                          p: ({ ...props }) => <p className="mb-2 last:mb-0" {...props} />,
+                          strong: ({ ...props }) => <strong className="font-semibold" {...props} />,
+                          em: ({ ...props }) => <em className="italic" {...props} />,
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          code: (props: any) => {
+                            const isInline =
+                              !props.className ||
+                              typeof props.className !== 'string' ||
+                              !props.className.includes('language-');
+                            return isInline ? (
+                              <code className="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs" {...props} />
+                            ) : (
+                              <code className="block rounded bg-gray-100 p-2 font-mono text-xs" {...props} />
+                            );
+                          },
+                          ul: ({ ...props }) => <ul className="my-2 ml-4 list-disc space-y-1" {...props} />,
+                          ol: ({ ...props }) => <ol className="my-2 ml-4 list-decimal space-y-1" {...props} />,
+                          li: ({ ...props }) => <li className="text-sm" {...props} />,
+                          h1: ({ children, ...props }) => (
+                            <h1 className="mb-2 mt-3 text-lg font-bold" {...props}>
+                              {children}
+                            </h1>
+                          ),
+                          h2: ({ children, ...props }) => (
+                            <h2 className="mb-2 mt-3 text-base font-bold" {...props}>
+                              {children}
+                            </h2>
+                          ),
+                          h3: ({ children, ...props }) => (
+                            <h3 className="mb-1 mt-2 text-sm font-semibold" {...props}>
+                              {children}
+                            </h3>
+                          ),
+                          blockquote: ({ ...props }) => (
+                            <blockquote className="my-2 border-l-4 border-gray-300 pl-3 italic" {...props} />
+                          ),
+                          a: ({ children, ...props }) => (
+                            <a className="text-blue-600 underline hover:text-blue-800" {...props}>
+                              {children}
+                            </a>
+                          ),
+                        }}>
+                        {response}
+                      </ReactMarkdown>
+                    </div>
                   </div>
                 )}
 
@@ -1111,8 +1290,53 @@ Please provide a helpful answer that considers the selected text and page contex
                 )}
 
                 {response && (
-                  <div className="prose prose-sm max-w-none">
-                    <div className="whitespace-pre-wrap text-sm leading-relaxed text-gray-800">{response}</div>
+                  <div className="prose prose-sm max-w-none text-gray-800">
+                    <ReactMarkdown
+                      components={{
+                        p: ({ ...props }) => <p className="mb-2 text-sm last:mb-0" {...props} />,
+                        strong: ({ ...props }) => <strong className="font-semibold" {...props} />,
+                        em: ({ ...props }) => <em className="italic" {...props} />,
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        code: (props: any) => {
+                          const isInline =
+                            !props.className ||
+                            typeof props.className !== 'string' ||
+                            !props.className.includes('language-');
+                          return isInline ? (
+                            <code className="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs" {...props} />
+                          ) : (
+                            <code className="block rounded bg-gray-100 p-2 font-mono text-xs" {...props} />
+                          );
+                        },
+                        ul: ({ ...props }) => <ul className="my-2 ml-4 list-disc space-y-1" {...props} />,
+                        ol: ({ ...props }) => <ol className="my-2 ml-4 list-decimal space-y-1" {...props} />,
+                        li: ({ ...props }) => <li className="text-sm" {...props} />,
+                        h1: ({ children, ...props }) => (
+                          <h1 className="mb-2 mt-3 text-base font-bold" {...props}>
+                            {children}
+                          </h1>
+                        ),
+                        h2: ({ children, ...props }) => (
+                          <h2 className="mb-2 mt-3 text-sm font-bold" {...props}>
+                            {children}
+                          </h2>
+                        ),
+                        h3: ({ children, ...props }) => (
+                          <h3 className="mb-1 mt-2 text-sm font-semibold" {...props}>
+                            {children}
+                          </h3>
+                        ),
+                        blockquote: ({ ...props }) => (
+                          <blockquote className="my-2 border-l-4 border-gray-300 pl-3 italic" {...props} />
+                        ),
+                        a: ({ children, ...props }) => (
+                          <a className="text-blue-600 underline hover:text-blue-800" {...props}>
+                            {children}
+                          </a>
+                        ),
+                      }}>
+                      {response}
+                    </ReactMarkdown>
                   </div>
                 )}
 
