@@ -25,7 +25,14 @@ export default config(
   },
   // Custom config
   {
-    ignores: ['**/build/**', '**/dist/**', '**/node_modules/**', 'chrome-extension/manifest.js', 'eslint.config.ts'],
+    ignores: [
+      '**/build/**',
+      '**/dist/**',
+      '**/node_modules/**',
+      'chrome-extension/manifest.js',
+      'eslint.config.ts',
+      'chrome-extension/public/tracky-mouse/**',
+    ],
   },
   {
     files: ['**/*.{ts,tsx}'],
@@ -109,6 +116,7 @@ export default config(
       globals: {
         ...browser,
         ...es2020,
+        TrackyMouse: 'readonly',
       },
     },
     rules: {
