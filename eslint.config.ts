@@ -25,7 +25,7 @@ export default config(
   },
   // Custom config
   {
-    ignores: ['**/build/**', '**/dist/**', '**/node_modules/**', 'chrome-extension/manifest.js'],
+    ignores: ['**/build/**', '**/dist/**', '**/node_modules/**', 'chrome-extension/manifest.js', 'eslint.config.ts'],
   },
   {
     files: ['**/*.{ts,tsx}'],
@@ -100,6 +100,19 @@ export default config(
     files: ['**/packages/shared/**/*.ts'],
     rules: {
       'no-restricted-imports': 'off',
+    },
+  },
+  // Browser globals for injected page scripts
+  {
+    files: ['chrome-extension/public/**/*.js'],
+    languageOptions: {
+      globals: {
+        ...browser,
+        ...es2020,
+      },
+    },
+    rules: {
+      'no-empty': ['error', { allowEmptyCatch: true }],
     },
   },
 );
