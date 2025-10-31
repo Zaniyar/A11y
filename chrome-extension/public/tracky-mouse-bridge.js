@@ -105,6 +105,63 @@
 
           let lastElOver = null;
 
+          // Auto-scroll setup - store in window for cleanup
+          window.__TrackyMouseScrollAnimation__ = null;
+          const EDGE_THRESHOLD = 20; // Pixels from edge to trigger scroll
+          const SCROLL_SPEED_BASE = 100; // Base scroll speed
+          const SCROLL_SPEED_MAX = 150; // Max scroll speed
+
+          function autoScroll(x, y) {
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+
+            // Calculate distance from edges
+            const distanceFromTop = y;
+            const distanceFromBottom = viewportHeight - y;
+            const distanceFromLeft = x;
+            const distanceFromRight = viewportWidth - x;
+
+            let scrollX = 0;
+            let scrollY = 0;
+
+            // Check vertical edges
+            if (distanceFromTop < EDGE_THRESHOLD) {
+              // Near top - scroll up
+              const intensity = 1 - distanceFromTop / EDGE_THRESHOLD;
+              scrollY = -Math.max(SCROLL_SPEED_BASE, intensity * SCROLL_SPEED_MAX);
+            } else if (distanceFromBottom < EDGE_THRESHOLD) {
+              // Near bottom - scroll down
+              const intensity = 1 - distanceFromBottom / EDGE_THRESHOLD;
+              scrollY = Math.max(SCROLL_SPEED_BASE, intensity * SCROLL_SPEED_MAX);
+            }
+
+            // Check horizontal edges
+            if (distanceFromLeft < EDGE_THRESHOLD) {
+              // Near left - scroll left
+              const intensity = 1 - distanceFromLeft / EDGE_THRESHOLD;
+              scrollX = -Math.max(SCROLL_SPEED_BASE, intensity * SCROLL_SPEED_MAX);
+            } else if (distanceFromRight < EDGE_THRESHOLD) {
+              // Near right - scroll right
+              const intensity = 1 - distanceFromRight / EDGE_THRESHOLD;
+              scrollX = Math.max(SCROLL_SPEED_BASE, intensity * SCROLL_SPEED_MAX);
+            }
+
+            // Apply scroll
+            if (scrollX !== 0 || scrollY !== 0) {
+              window.scrollBy(scrollX, scrollY);
+              // Continue scrolling
+              window.__TrackyMouseScrollAnimation__ = requestAnimationFrame(function () {
+                autoScroll(x, y);
+              });
+            } else {
+              // Stop scrolling when not near edges
+              if (window.__TrackyMouseScrollAnimation__) {
+                cancelAnimationFrame(window.__TrackyMouseScrollAnimation__);
+                window.__TrackyMouseScrollAnimation__ = null;
+              }
+            }
+          }
+
           window.TrackyMouse.onPointerMove = function (x, y) {
             const target = document.elementFromPoint(x, y) || document.body;
             if (target !== lastElOver) {
@@ -142,6 +199,13 @@
               }),
             );
             target.dispatchEvent(event);
+
+            // Trigger auto-scroll when near edges
+            if (window.__TrackyMouseScrollAnimation__) {
+              cancelAnimationFrame(window.__TrackyMouseScrollAnimation__);
+              window.__TrackyMouseScrollAnimation__ = null;
+            }
+            autoScroll(x, y);
           };
 
           // Listen for messages from content script
@@ -226,6 +290,12 @@
               if (window.__TrackyMouseInstance__ && window.__TrackyMouseInstance__.dispose) {
                 window.__TrackyMouseInstance__.dispose();
                 window.__TrackyMouseInstance__ = null;
+              }
+
+              // Stop any ongoing scroll animation
+              if (window.__TrackyMouseScrollAnimation__) {
+                cancelAnimationFrame(window.__TrackyMouseScrollAnimation__);
+                window.__TrackyMouseScrollAnimation__ = null;
               }
 
               // Remove the entire TrackyMouse UI container

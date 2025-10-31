@@ -68,17 +68,44 @@ We integrated Web Speech API for speech-to-text, allowing users to ask questions
 
 We learned that **true accessibility doesn't ask users to adapt to the interface. It adapts the interface to the user.**
 
+### The Eye Control Challenge: When Movement Becomes Interaction
+
+But we didn't stop at voice. We asked: **What about users who can't use their hands at all?**
+
+We integrated **TrackyMouse**, a head-tracking library that turns head movements into mouse control. But integration wasn't straightforward:
+
+**The Problem**: Chrome extensions run in isolated contexts. TrackyMouse needed to run in the page context to access the camera. Web Workers couldn't load from `chrome-extension://` URLs. Content Security Policy blocked inline scripts. Functions couldn't be sent via `postMessage`.
+
+**The Solution**: We built another bridge. We created a bridge script that:
+- Loads TrackyMouse into the page context (bypassing extension isolation)
+- Creates Blob URLs for Workers (bypassing cross-origin restrictions)
+- Monkey-patches the Worker constructor (replacing extension URLs with Blob URLs)
+- Fixes `importScripts` paths (making relative URLs absolute)
+- Handles click callbacks in the page context (avoiding DataCloneError)
+
+**The Result**: A minimal, elegant interface. Just a small circular video bubble in the bottom-right corner. No bulky controls. No UI clutter. Move your head, control the cursor. Hover over buttons, they click automatically (dwell clicking). Get near the screen edge, the page scrolls automatically.
+
+**We learned that true accessibility means removing barriers we didn't even know existed.**
+
 ## What We Built: A Tool That Makes the Invisible, Visible
 
 ### Quick Ask AI: The Invisible Helper
 
-Select text. A subtle widget appears. Four buttons: **Ask**, **Summarize**, **Simplify**, **Translate**. 
+Select text. A subtle widget appears. Five buttons: **Ask**, **Summarize**, **Simplify**, **Translate**, **Camera**. 
 
-- **Ask**: Opens a chat interface. Ask anything about the selected text. The AI understands context, speaks the page's language, responds intelligently.
+- **Ask**: Opens a chat interface. Ask anything about the selected text. The AI understands context, speaks the page's language, responds intelligently. Responses are rendered in beautiful markdown with syntax highlighting, code blocks, lists, and proper formatting.
 - **Summarize**: Condenses long text into digestible summaries. Perfect for cognitive overload, time constraints, or simply scanning.
 - **Simplify**: Rewrites complex language into simple, clear text. For learning disabilities, language barriers, or anyone who prefers clarity.
 - **Translate**: Instantly translates content. Automatically detects source language, responds in user's preferred language.
 - **Voice Control**: Speak your question. Hear the response. Hands-free, eyes-free, barrier-free.
+- **Camera (Eye Control)**: Enables head-tracking mouse control. A small circular video feed appears in the bottom-right corner. Move your head to control the cursor. Hover to click (dwell clicking). Move near screen edges to auto-scroll. Completely hands-free navigation.
+
+#### UI Innovation: Draggable, Adaptable, Accessible
+
+The response dialog isn't just functional—it's **thoughtful**:
+- **Draggable**: Sometimes the dialog covers what you need to see. Grab the header, drag it anywhere. The dialog stays within viewport bounds, never getting lost off-screen.
+- **Markdown Rendering**: AI responses aren't plain text. They're properly formatted with headings, code blocks, lists, emphasis, and links. Code gets syntax highlighting. Technical responses become readable.
+- **Persistent Chat History**: Ask follow-up questions. The AI remembers context. Build a conversation, not just isolated queries.
 
 ### The Technical Achievement
 
@@ -110,6 +137,29 @@ We're not just using AI APIs—we're **pioneering their integration** in Chrome 
 
 **The Learning**: We built a TreeWalker-based extraction system that understands the DOM structure, respects visibility, preserves context, and handles massive pages. We learned that **parsing isn't extraction—understanding is extraction.**
 
+### Challenge 5: TrackyMouse and the Isolated World Problem
+
+**The Problem**: TrackyMouse is a third-party library that expects to run in the page's global context with camera access and Web Workers. But Chrome extensions run in isolated contexts. Content scripts can't access the page's `window.TrackyMouse`. Workers can't load from `chrome-extension://` URLs. CSP blocks inline scripts. The `postMessage` API can't clone functions.
+
+**The Learning**: We built a complete bridge architecture:
+- Created a dedicated bridge script (`tracky-mouse-bridge.js`) that runs in page context
+- Fetched Worker code as text, injected it as Blob URLs to bypass cross-origin restrictions
+- Monkey-patched the `Worker` constructor to intercept and replace extension URLs
+- Fixed `importScripts` relative paths by replacing them with absolute URLs
+- Moved click callbacks into the bridge script to avoid DataCloneError
+- Implemented auto-scroll by monitoring pointer position and triggering smooth scrolling near screen edges
+- Added intelligent edge detection (20px threshold) with dynamic scroll speed (100-150px/s based on proximity)
+
+**We learned that sometimes you have to rewrite the rules to make the impossible possible.**
+
+### Challenge 6: Markdown Rendering and User Experience
+
+**The Problem**: AI responses often include markdown formatting—code blocks, lists, headings, emphasis. Displaying them as plain text loses all structure and readability.
+
+**The Learning**: We integrated `react-markdown` with custom Tailwind-styled components for every element. Code blocks get monospace fonts and background. Lists get proper indentation. Headings get hierarchy. Links get proper styling. The result: AI responses that are as beautiful as they are functional.
+
+**We learned that accessibility isn't just about making things work—it's about making them delightful.**
+
 ## What We Learned: Beyond Code
 
 ### Accessibility is Universal
@@ -122,14 +172,23 @@ We didn't build this to replace human understanding. We built it to **augment** 
 
 ### Complexity is Invisible, Simplicity is Visible
 
-Users see four buttons. They don't see:
-- Three-layer architecture
-- Message passing protocols
-- Origin Trial token management
-- Streaming response handling
-- Content extraction algorithms
-- Language detection and mapping
-- Fallback systems and error handling
+Users see five buttons and a circular camera bubble. They don't see:
+- Three-layer architecture for AI API integration
+- Two-layer bridge for TrackyMouse integration
+- Message passing protocols with source verification
+- Origin Trial token management and timing
+- Streaming response handling with async generators
+- Content extraction algorithms with TreeWalker traversal
+- Language detection and mapping with 75+ language support
+- Fallback systems and error handling at every layer
+- Blob URL creation for Workers
+- Worker constructor monkey-patching
+- `importScripts` path rewriting
+- Click callback handling in page context
+- Auto-scroll with edge detection and dynamic speed
+- Markdown rendering with custom styled components
+- Drag-and-drop with viewport clamping
+- Dwell clicking with configurable targets
 
 **The best engineering is invisible. The best accessibility is seamless.**
 
@@ -146,7 +205,22 @@ This isn't just a Chrome extension. It's a **statement**:
 - That "disabled" is a word we should retire
 - That AI can be a force for inclusion, not exclusion
 - That complexity can be beautiful when it serves simplicity
+- That **hands-free doesn't mean helpless**
+- That **barriers exist to be broken**
 - That **we can all win when we design for everyone**
+
+### Real Impact: Who This Helps
+
+This extension isn't theoretical. It helps real people:
+
+- **Motor Disabilities**: Quadriplegia, cerebral palsy, ALS, muscular dystrophy—anyone with limited hand mobility can now browse the web using only head movements.
+- **Temporary Injuries**: Broken arms, carpal tunnel surgery, RSI—situations we all might face.
+- **Situational Constraints**: Holding a baby, carrying groceries, eating lunch—moments when hands aren't free.
+- **Cognitive Challenges**: ADHD, dyslexia, autism—when text simplification and summarization become necessary, not nice-to-have.
+- **Language Barriers**: Non-native speakers, travelers, immigrants—when translation becomes access.
+- **Visual Fatigue**: Long reading sessions, late-night research—when text-to-speech becomes relief.
+
+**Every feature solves a real problem for real people.**
 
 ## The Future: Where We're Going
 
@@ -168,9 +242,21 @@ And that future starts now.
 - **Chrome Extension**: Manifest V3, Content Scripts, Page Scripts
 - **AI APIs**: Chrome Built-in AI (LanguageModel, Summarizer, Translator, Rewriter)
 - **Speech**: Web Speech API (Speech Recognition + Speech Synthesis)
-- **Architecture**: 3-layer message passing system
-- **Build**: Vite + Turborepo
+- **Eye Control**: TrackyMouse (head tracking + dwell clicking)
+- **Markdown**: react-markdown with custom Tailwind components
+- **Architecture**: 
+  - 3-layer message passing system for AI integration
+  - 2-layer bridge system for TrackyMouse integration
+  - Blob URL creation for Workers
+  - Worker constructor monkey-patching
+- **Build**: Vite + Turborepo + pnpm
 - **Language**: TypeScript with strict typing
+- **Advanced Features**:
+  - Streaming responses with async generators
+  - Drag-and-drop with viewport clamping
+  - Auto-scroll with edge detection
+  - Content Security Policy compliance
+  - Cross-origin Worker loading
 
 ---
 
