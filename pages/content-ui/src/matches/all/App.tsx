@@ -5,6 +5,7 @@ import {
   simplifyText,
   translateText,
   getPageContext,
+  getPageLanguage,
 } from './ai-services';
 import { injectPageScript } from './inject-page-script';
 import { useEffect, useState, useRef, useCallback } from 'react';
@@ -19,6 +20,43 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
 }
+
+// Helper function to get language name from language code
+const getLanguageName = (langCode: string): string => {
+  const languageNames: Record<string, string> = {
+    en: 'English',
+    es: 'Spanish',
+    fr: 'French',
+    de: 'German',
+    it: 'Italian',
+    pt: 'Portuguese',
+    zh: 'Chinese',
+    ja: 'Japanese',
+    ko: 'Korean',
+    ru: 'Russian',
+    ar: 'Arabic',
+    hi: 'Hindi',
+    nl: 'Dutch',
+    pl: 'Polish',
+    sv: 'Swedish',
+    da: 'Danish',
+    fi: 'Finnish',
+    no: 'Norwegian',
+    tr: 'Turkish',
+    cs: 'Czech',
+    el: 'Greek',
+    he: 'Hebrew',
+    th: 'Thai',
+    vi: 'Vietnamese',
+    id: 'Indonesian',
+    ms: 'Malay',
+    uk: 'Ukrainian',
+    ro: 'Romanian',
+    hu: 'Hungarian',
+  };
+
+  return languageNames[langCode.toLowerCase()] || langCode.toUpperCase();
+};
 
 export default function App() {
   const [selectedText, setSelectedText] = useState<string>('');
@@ -43,6 +81,7 @@ export default function App() {
   const containerRef = useRef<HTMLDivElement>(null);
   const responseRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const showResponseRef = useRef(false);
 
   useEffect(() => {
     // Inject Origin Trial token if not already present
@@ -97,15 +136,16 @@ export default function App() {
     const handleSelection = () => {
       const selection = window.getSelection();
       if (!selection || selection.isCollapsed) {
+        // Only hide the quick action buttons if response popup is not showing
+        // Don't close the response popup - let users interact with it
         setShowUI(false);
-        setShowResponse(false);
         return;
       }
 
       const text = selection.toString().trim();
       if (!text || text.length < 3) {
+        // Only hide the quick action buttons if response popup is not showing
         setShowUI(false);
-        setShowResponse(false);
         return;
       }
 
@@ -120,41 +160,103 @@ export default function App() {
         y: rect.top - 10,
       });
 
-      setShowUI(true);
-      setShowResponse(false);
-      setResponse('');
-      setError('');
-    };
-
-    // Handle click outside to hide UI
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node) &&
-        responseRef.current &&
-        !responseRef.current.contains(e.target as Node)
-      ) {
-        setShowUI(false);
-        setShowResponse(false);
-        window.getSelection()?.removeAllRanges();
+      // Only show quick action buttons if response popup is not showing
+      // If response popup is open, don't show quick actions (user is interacting with response)
+      if (!showResponseRef.current) {
+        setShowUI(true);
+        setResponse('');
+        setError('');
       }
     };
 
+    // Handle click outside to hide only the quick action buttons, not the response popup
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+
+      // Don't close if clicking inside the response popup
+      if (responseRef.current?.contains(target)) {
+        return; // User is interacting with the response popup
+      }
+
+      // Don't close if clicking inside the quick action buttons
+      if (containerRef.current?.contains(target)) {
+        return; // User is clicking the action buttons
+      }
+
+      // Check if there's an active text selection - if so, don't hide the widget
+      const selection = window.getSelection();
+      if (selection && !selection.isCollapsed) {
+        const selectedText = selection.toString().trim();
+        if (selectedText.length >= 3) {
+          // There's a valid selection, don't hide the widget
+          return;
+        }
+      }
+
+      // Only hide the quick action buttons if there's no active selection
+      // and response popup is not showing
+      if (!showResponseRef.current) {
+        setShowUI(false);
+      }
+      // Don't close the response popup - let users interact with it
+      // Never call setShowResponse(false) here
+    };
+
     document.addEventListener('selectionchange', handleSelection);
-    document.addEventListener('mousedown', handleClickOutside);
+
+    // Store the click handler reference for cleanup
+    // Use mousedown but with a delay to allow selection to complete first
+    const clickOutsideHandler = (e: MouseEvent) => {
+      // Use a small delay to allow selectionchange to fire first
+      setTimeout(() => {
+        handleClickOutside(e);
+      }, 10);
+    };
+
+    document.addEventListener('mousedown', clickOutsideHandler);
 
     return () => {
       clearTimeout(timeoutId);
       clearTimeout(retryTimeoutId);
       document.removeEventListener('selectionchange', handleSelection);
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('mousedown', clickOutsideHandler);
     };
   }, []);
 
   const handleAction = useCallback(
-    async (action: ActionType) => {
+    async (action: ActionType, e?: React.MouseEvent) => {
+      // Prevent event propagation to avoid triggering click-outside handlers
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        // stopImmediatePropagation may not be available on all event types
+        if (typeof e.stopImmediatePropagation === 'function') {
+          e.stopImmediatePropagation();
+        }
+        // Also try native event if available
+        if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
+          e.nativeEvent.stopImmediatePropagation();
+        }
+      }
+
       if (!selectedText || isLoading) return;
       if (action === 'translate' && !targetLanguage) return;
+
+      // For "Ask" action, just show the UI and wait for user's question
+      if (action === 'ask') {
+        console.log('[A11y Extension] Ask button clicked, showing chat popup');
+        setActiveAction(action);
+        setError('');
+        setResponse('');
+        setShowResponse(true);
+        setShowUI(false);
+        setChatMessages([]); // Start fresh
+        setFollowUpInput(''); // Clear any previous input
+        // Update ref immediately so click-outside handler knows popup is open
+        showResponseRef.current = true;
+        console.log('[A11y Extension] Chat popup state set, showResponse:', true);
+        return; // Don't send prompt yet, wait for user to type question
+      }
 
       setIsLoading(true);
       setActiveAction(action);
@@ -164,41 +266,19 @@ export default function App() {
       setShowUI(false);
 
       try {
-        const pageContext = getPageContext();
-
         switch (action) {
-          case 'ask': {
-            // Initialize chat with the selected text context
-            const initialUserMessage = `Explain this text: "${selectedText.slice(0, 200)}${selectedText.length > 200 ? '...' : ''}"`;
-
-            setChatMessages([{ role: 'user', content: initialUserMessage }]);
-
-            const prompt = `You are an accessibility assistant helping users understand web content. The user has selected this text on a webpage:
-
-"${selectedText}"
-
-Context about the page:
-${pageContext}
-
-Please provide a clear, helpful explanation or summary of what this selected text means, in plain language.`;
-
-            let fullResponse = '';
-            for await (const chunk of streamPromptResponse(prompt)) {
-              fullResponse += chunk;
-              setResponse(fullResponse);
-            }
-
-            // Add assistant response to chat
-            setChatMessages(prev => [...prev, { role: 'assistant', content: fullResponse }]);
-            break;
-          }
-
           case 'summarize': {
+            const pageLanguage = getPageLanguage();
+            const languageName = getLanguageName(pageLanguage);
+
             if (!aiSupport?.hasSummarizer) {
               // Fallback to Prompt API
-              const prompt = `Summarize the following text in a clear, concise way:
+              const prompt = `Summarize the following text in a clear, concise way.
 
-"${selectedText}"`;
+Text to summarize:
+"${selectedText}"
+
+IMPORTANT: The page language is ${languageName} (${pageLanguage}). Please provide the summary in ${languageName}.`;
 
               let fullResponse = '';
               for await (const chunk of streamPromptResponse(prompt)) {
@@ -210,6 +290,7 @@ Please provide a clear, helpful explanation or summary of what this selected tex
                 type: 'tldr',
                 format: 'plain-text',
                 length: 'medium',
+                outputLanguage: pageLanguage,
               });
               setResponse(summary);
             }
@@ -217,11 +298,17 @@ Please provide a clear, helpful explanation or summary of what this selected tex
           }
 
           case 'simplify': {
+            const pageLanguage = getPageLanguage();
+            const languageName = getLanguageName(pageLanguage);
+
             if (!aiSupport?.hasRewriter) {
               // Fallback to Prompt API
-              const prompt = `Rewrite the following text in simpler, more accessible language that's easier to understand. Keep the meaning the same but use plain language:
+              const prompt = `Rewrite the following text in simpler, more accessible language that's easier to understand. Keep the meaning the same but use plain language.
 
-"${selectedText}"`;
+Text to simplify:
+"${selectedText}"
+
+IMPORTANT: The page language is ${languageName} (${pageLanguage}). Please provide the simplified text in ${languageName}.`;
 
               let fullResponse = '';
               for await (const chunk of streamPromptResponse(prompt)) {
@@ -274,9 +361,12 @@ Please provide a clear, helpful explanation or summary of what this selected tex
   );
 
   const handleCopy = useCallback(async () => {
-    if (!response) return;
+    // Copy the last assistant message or the streaming response
+    const textToCopy = response || chatMessages.filter(msg => msg.role === 'assistant').pop()?.content || '';
+    if (!textToCopy) return;
+
     try {
-      await navigator.clipboard.writeText(response);
+      await navigator.clipboard.writeText(textToCopy);
       // Show temporary feedback
       const button = document.querySelector('[data-copy-button]') as HTMLButtonElement;
       if (button) {
@@ -289,7 +379,7 @@ Please provide a clear, helpful explanation or summary of what this selected tex
     } catch {
       setError('Failed to copy to clipboard');
     }
-  }, [response]);
+  }, [response, chatMessages]);
 
   const handleClose = useCallback(() => {
     setShowResponse(false);
@@ -301,7 +391,7 @@ Please provide a clear, helpful explanation or summary of what this selected tex
     window.getSelection()?.removeAllRanges();
   }, []);
 
-  const handleFollowUpQuestion = useCallback(async () => {
+  const handleSendQuestion = useCallback(async () => {
     if (!followUpInput.trim() || isLoading) return;
 
     const question = followUpInput.trim();
@@ -315,20 +405,27 @@ Please provide a clear, helpful explanation or summary of what this selected tex
 
     try {
       const pageContext = getPageContext();
+      const pageLanguage = getPageLanguage();
+      const languageName = getLanguageName(pageLanguage);
+
+      // Build prompt with selected text context
+      // Only include previous messages (excluding the current question which we'll add separately)
+      const previousMessages = chatMessages
+        .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
+        .join('\n\n');
+
       const prompt = `You are an accessibility assistant helping users understand web content.
 
-Selected text from the webpage:
+The user has selected this text on a webpage:
 "${selectedText}"
 
 Context about the page:
 ${pageContext}
+${previousMessages ? `\nPrevious conversation:\n${previousMessages}\n\n` : ''}User's question: ${question}
 
-Previous conversation:
-${chatMessages.map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`).join('\n\n')}
+IMPORTANT: The page language is ${languageName} (${pageLanguage}). Please respond in ${languageName} unless the user explicitly asks you to respond in a different language.
 
-User's follow-up question: ${question}
-
-Please provide a helpful answer that considers the selected text, page context, and previous conversation.`;
+Please provide a helpful answer that considers the selected text and page context.`;
 
       let fullResponse = '';
       for await (const chunk of streamPromptResponse(prompt)) {
@@ -338,6 +435,7 @@ Please provide a helpful answer that considers the selected text, page context, 
 
       // Add assistant response to chat
       setChatMessages(prev => [...prev, { role: 'assistant', content: fullResponse }]);
+      setResponse(''); // Clear streaming response as it's now in chatMessages
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred. Please try again.';
       setError(errorMessage);
@@ -345,6 +443,11 @@ Please provide a helpful answer that considers the selected text, page context, 
       setIsLoading(false);
     }
   }, [followUpInput, selectedText, chatMessages, isLoading]);
+
+  // Update ref when showResponse changes
+  useEffect(() => {
+    showResponseRef.current = showResponse;
+  }, [showResponse]);
 
   // Scroll to bottom when new messages are added
   useEffect(() => {
@@ -375,28 +478,45 @@ Please provide a helpful answer that considers the selected text, page context, 
           role="toolbar"
           aria-label="Quick Ask Actions">
           <button
-            onClick={() => handleAction('ask')}
+            onClick={e => {
+              e.preventDefault();
+              e.stopPropagation();
+              // stopImmediatePropagation may not be available on all event types
+              if (typeof e.stopImmediatePropagation === 'function') {
+                e.stopImmediatePropagation();
+              }
+              // Also try native event if available
+              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
+                e.nativeEvent.stopImmediatePropagation();
+              }
+              handleAction('ask', e);
+            }}
+            onMouseDown={e => {
+              // Prevent mousedown from clearing selection or interfering
+              e.preventDefault();
+              e.stopPropagation();
+            }}
             disabled={isLoading}
             className="rounded px-3 py-1.5 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-50 disabled:opacity-50"
             title="Ask about this text">
             Ask
           </button>
           <button
-            onClick={() => handleAction('summarize')}
+            onClick={e => handleAction('summarize', e)}
             disabled={isLoading || !aiSupport?.hasSummarizer}
             className="rounded px-3 py-1.5 text-sm font-medium text-purple-600 transition-colors hover:bg-purple-50 disabled:opacity-50"
             title="Summarize this text">
             Summarize
           </button>
           <button
-            onClick={() => handleAction('simplify')}
+            onClick={e => handleAction('simplify', e)}
             disabled={isLoading || !aiSupport?.hasRewriter}
             className="rounded px-3 py-1.5 text-sm font-medium text-green-600 transition-colors hover:bg-green-50 disabled:opacity-50"
             title="Simplify this text">
             Simplify
           </button>
           <button
-            onClick={() => handleAction('translate')}
+            onClick={e => handleAction('translate', e)}
             disabled={isLoading || !aiSupport?.hasTranslator}
             className="rounded px-3 py-1.5 text-sm font-medium text-orange-600 transition-colors hover:bg-orange-50 disabled:opacity-50"
             title="Translate this text">
@@ -457,8 +577,20 @@ Please provide a helpful answer that considers the selected text, page context, 
             )}
 
             {/* Chat mode for "Ask" action */}
-            {activeAction === 'ask' && chatMessages.length > 0 ? (
+            {activeAction === 'ask' ? (
               <div className="space-y-3">
+                {/* Show selected text context when no messages yet */}
+                {chatMessages.length === 0 && (
+                  <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
+                    <div className="mb-2 text-xs font-semibold text-blue-700">Selected text:</div>
+                    <div className="text-sm text-blue-900">
+                      {selectedText.slice(0, 300)}
+                      {selectedText.length > 300 ? '...' : ''}
+                    </div>
+                  </div>
+                )}
+
+                {/* Show chat messages */}
                 {chatMessages.map((msg, idx) => (
                   <div
                     key={idx}
@@ -516,10 +648,10 @@ Please provide a helpful answer that considers the selected text, page context, 
           </div>
 
           {/* Footer */}
-          {(response || error || chatMessages.length > 0) && (
+          {(response || error || chatMessages.length > 0 || activeAction === 'ask') && (
             <div className="border-t border-gray-200 bg-gray-50">
-              {/* Follow-up input for "Ask" action */}
-              {activeAction === 'ask' && chatMessages.length > 0 && (
+              {/* Input for "Ask" action - show always, not just for follow-ups */}
+              {activeAction === 'ask' && (
                 <div className="border-b border-gray-200 p-3">
                   <div className="flex gap-2">
                     <input
@@ -529,15 +661,19 @@ Please provide a helpful answer that considers the selected text, page context, 
                       onKeyDown={e => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
-                          handleFollowUpQuestion();
+                          handleSendQuestion();
                         }
                       }}
-                      placeholder="Ask a follow-up question..."
+                      placeholder={
+                        chatMessages.length === 0
+                          ? 'Ask a question about the selected text...'
+                          : 'Ask a follow-up question...'
+                      }
                       disabled={isLoading}
                       className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
                     />
                     <button
-                      onClick={handleFollowUpQuestion}
+                      onClick={handleSendQuestion}
                       disabled={!followUpInput.trim() || isLoading}
                       className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
                       Send
@@ -547,17 +683,19 @@ Please provide a helpful answer that considers the selected text, page context, 
                 </div>
               )}
 
-              {/* Copy and attribution */}
-              <div className="flex items-center justify-between p-3">
-                <button
-                  onClick={handleCopy}
-                  disabled={!response}
-                  data-copy-button
-                  className="rounded px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50">
-                  Copy
-                </button>
-                <p className="text-xs text-gray-400">Powered by Chrome Built-in AI</p>
-              </div>
+              {/* Copy and attribution - show only if there's content to copy */}
+              {(response || chatMessages.length > 0) && (
+                <div className="flex items-center justify-between p-3">
+                  <button
+                    onClick={handleCopy}
+                    disabled={!response && chatMessages.length === 0}
+                    data-copy-button
+                    className="rounded px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50">
+                    Copy
+                  </button>
+                  <p className="text-xs text-gray-400">Powered by Chrome Built-in AI</p>
+                </div>
+              )}
             </div>
           )}
         </div>

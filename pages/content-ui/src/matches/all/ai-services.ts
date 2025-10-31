@@ -284,18 +284,44 @@ export const translateText = async (text: string, targetLanguage: string, source
 };
 
 /**
+ * Get page language from HTML lang attribute
+ */
+export const getPageLanguage = (): string => {
+  // Try documentElement.lang first (most common)
+  const lang = document.documentElement.lang || document.documentElement.getAttribute('lang');
+
+  if (lang) {
+    // Extract just the language code (e.g., "en" from "en-US")
+    return lang.split('-')[0].toLowerCase();
+  }
+
+  // Fallback to meta tag
+  const metaLang =
+    document.querySelector('meta[http-equiv="content-language"]')?.getAttribute('content') ||
+    document.querySelector('meta[property="og:locale"]')?.getAttribute('content');
+
+  if (metaLang) {
+    return metaLang.split('-')[0].toLowerCase();
+  }
+
+  // Default to English
+  return 'en';
+};
+
+/**
  * Get page context (for AI prompts)
  */
 export const getPageContext = (): string => {
   const title = document.title;
   const url = window.location.href;
+  const language = getPageLanguage();
   const headings = Array.from(document.querySelectorAll('h1, h2, h3'))
     .slice(0, 5)
     .map(h => h.textContent?.trim())
     .filter(Boolean)
     .join(' | ');
 
-  return `Page: ${title}\nURL: ${url}\nMain headings: ${headings || 'N/A'}`;
+  return `Page: ${title}\nURL: ${url}\nLanguage: ${language}\nMain headings: ${headings || 'N/A'}`;
 };
 
 export interface AIResponse {

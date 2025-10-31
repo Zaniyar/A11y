@@ -5,7 +5,7 @@
   },
   "extensionName": {
     "description": "Extension name",
-    "message": "Chrome extension boilerplate"
+    "message": "A11y"
   },
   "toggleTheme": {
     "message": "Toggle theme"
