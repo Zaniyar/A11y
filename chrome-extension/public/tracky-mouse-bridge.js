@@ -169,24 +169,12 @@
                 const trackyInstance = window.TrackyMouse.init();
                 window.__TrackyMouseInstance__ = trackyInstance;
 
-                // Hide all UI elements except video, auto-start tracking
+                // Hide all UI elements except canvas, auto-start tracking
                 setTimeout(function () {
                   // Hide the entire control panel with all sliders/buttons
                   var controlsPanel = document.querySelector('.tracky-mouse-controls');
                   if (controlsPanel) {
                     controlsPanel.style.display = 'none';
-                  }
-
-                  // Hide the canvas (face tracking overlay)
-                  var canvas = document.querySelector('.tracky-mouse-canvas');
-                  if (canvas) {
-                    canvas.style.display = 'none';
-                  }
-
-                  // Hide canvas container
-                  var canvasContainer = document.querySelector('.tracky-mouse-canvas-container-container');
-                  if (canvasContainer) {
-                    canvasContainer.style.display = 'none';
                   }
 
                   // Hide download message
@@ -195,20 +183,32 @@
                     downloadMsg.style.display = 'none';
                   }
 
-                  // Style video as small bubble in bottom-right
-                  var videoEl = document.getElementById('video');
-                  if (videoEl) {
-                    videoEl.style.position = 'fixed';
-                    videoEl.style.bottom = '20px';
-                    videoEl.style.right = '20px';
-                    videoEl.style.width = '150px';
-                    videoEl.style.height = '150px';
-                    videoEl.style.borderRadius = '50%';
-                    videoEl.style.objectFit = 'cover';
-                    videoEl.style.zIndex = '999999';
-                    videoEl.style.border = '3px solid #8b5cf6';
-                    videoEl.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
-                    videoEl.style.transform = 'scaleX(-1)'; // Mirror video
+                  // Style canvas as circular bubble in bottom-right
+                  var canvas = document.querySelector('.tracky-mouse-canvas');
+                  if (canvas) {
+                    canvas.style.position = 'fixed';
+                    canvas.style.bottom = '10px';
+                    canvas.style.right = '10px';
+                    canvas.style.width = '140px';
+                    canvas.style.height = '140px';
+                    canvas.style.borderRadius = '50%';
+                    canvas.style.objectFit = 'cover';
+                    canvas.style.zIndex = '999999';
+                    canvas.style.border = '3px solid #8b5cf6';
+                    canvas.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+                  }
+
+                  // Remove canvas container that wraps it (we want canvas to escape)
+                  var canvasContainer = document.querySelector('.tracky-mouse-canvas-container');
+                  if (canvasContainer && canvas) {
+                    // Move canvas out of container
+                    document.body.appendChild(canvas);
+                  }
+
+                  // Hide the canvas container wrapper
+                  var canvasContainerWrapper = document.querySelector('.tracky-mouse-canvas-container-container');
+                  if (canvasContainerWrapper) {
+                    canvasContainerWrapper.style.display = 'none';
                   }
 
                   // Auto-start tracking (simulate F9 / Start button click)
