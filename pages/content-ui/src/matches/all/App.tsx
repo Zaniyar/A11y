@@ -58,6 +58,59 @@ const getLanguageName = (langCode: string): string => {
   return languageNames[langCode.toLowerCase()] || langCode.toUpperCase();
 };
 
+// Extend Window interface for Web Speech API
+declare global {
+  interface Window {
+    SpeechRecognition: new () => SpeechRecognition;
+    webkitSpeechRecognition: new () => SpeechRecognition;
+    SpeechSynthesis: typeof SpeechSynthesis;
+  }
+
+  interface SpeechRecognition extends EventTarget {
+    continuous: boolean;
+    interimResults: boolean;
+    lang: string;
+    start(): void;
+    stop(): void;
+    abort(): void;
+    onstart: ((this: SpeechRecognition, ev: Event) => unknown) | null;
+    onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => unknown) | null;
+    onerror: ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => unknown) | null;
+    onend: ((this: SpeechRecognition, ev: Event) => unknown) | null;
+  }
+
+  interface SpeechRecognitionEvent extends Event {
+    results: SpeechRecognitionResultList;
+  }
+
+  interface SpeechRecognitionErrorEvent extends Event {
+    error: string;
+    message: string;
+  }
+
+  interface SpeechRecognitionResultList {
+    length: number;
+    item(index: number): SpeechRecognitionResult;
+    [index: number]: SpeechRecognitionResult;
+  }
+
+  interface SpeechRecognitionResult {
+    length: number;
+    item(index: number): SpeechRecognitionAlternative;
+    [index: number]: SpeechRecognitionAlternative;
+    isFinal: boolean;
+  }
+
+  interface SpeechRecognitionAlternative {
+    transcript: string;
+    confidence: number;
+  }
+
+  interface SpeechSynthesisErrorEvent extends Event {
+    error: string;
+  }
+}
+
 export default function App() {
   const [selectedText, setSelectedText] = useState<string>('');
   const [showUI, setShowUI] = useState(false);
@@ -78,10 +131,14 @@ export default function App() {
   const [targetLanguage, setTargetLanguage] = useState<string>('en');
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [followUpInput, setFollowUpInput] = useState<string>('');
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const responseRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const showResponseRef = useRef(false);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const synthesisRef = useRef<SpeechSynthesis | null>(null);
 
   useEffect(() => {
     // Inject Origin Trial token if not already present
@@ -437,7 +494,329 @@ IMPORTANT: The page language is ${languageName} (${pageLanguage}). Please provid
     setChatMessages([]);
     setFollowUpInput('');
     window.getSelection()?.removeAllRanges();
+    // Stop any ongoing speech recognition or synthesis
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+      setIsListening(false);
+    }
+    if (synthesisRef.current) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
   }, []);
+
+  /**
+   * Extract all visible text from the page
+   */
+  const extractPageContent = useCallback((): string => {
+    // Start from body to get ALL visible content, not just main/article
+    const rootElement = document.body;
+
+    // Get all visible text nodes from the entire page
+    const walker = document.createTreeWalker(rootElement, NodeFilter.SHOW_TEXT, {
+      acceptNode: (node: Node) => {
+        // Skip script and style elements
+        if (node.parentElement?.tagName === 'SCRIPT' || node.parentElement?.tagName === 'STYLE') {
+          return NodeFilter.FILTER_REJECT;
+        }
+
+        // Skip hidden elements
+        const parent = node.parentElement;
+        if (parent) {
+          const style = window.getComputedStyle(parent);
+          if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+            return NodeFilter.FILTER_REJECT;
+          }
+
+          // Skip common non-content elements
+          const tagName = parent.tagName.toLowerCase();
+          const role = parent.getAttribute('role');
+          const className = parent.className || '';
+
+          if (
+            tagName === 'nav' ||
+            tagName === 'header' ||
+            tagName === 'footer' ||
+            role === 'navigation' ||
+            role === 'banner' ||
+            role === 'contentinfo' ||
+            role === 'complementary' ||
+            className.includes('navigation') ||
+            className.includes('menu') ||
+            className.includes('sidebar') ||
+            className.includes('ad') ||
+            className.includes('advertisement') ||
+            className.includes('cookie') ||
+            className.includes('popup') ||
+            className.includes('modal')
+          ) {
+            // But still include if it's visible and has meaningful content
+            const text = node.textContent?.trim();
+            if (!text || text.length < 3) {
+              return NodeFilter.FILTER_REJECT;
+            }
+            // Allow navigation if it contains substantial content
+            if (text.length > 20) {
+              return NodeFilter.FILTER_ACCEPT;
+            }
+            return NodeFilter.FILTER_REJECT;
+          }
+        }
+
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    });
+
+    const textNodes: string[] = [];
+    const seenText = new Set<string>(); // Avoid duplicates
+    let node;
+
+    while ((node = walker.nextNode())) {
+      const text = node.textContent?.trim();
+
+      // Only include meaningful text (at least 3 characters, no pure whitespace)
+      if (text && text.length >= 3 && /\S/.test(text)) {
+        // Skip duplicate text
+        const normalizedText = text.toLowerCase().slice(0, 50); // Use first 50 chars as key
+        if (!seenText.has(normalizedText)) {
+          seenText.add(normalizedText);
+
+          // Get parent element to preserve context
+          const parent = node.parentElement;
+          if (parent) {
+            const tagName = parent.tagName.toLowerCase();
+            const context =
+              tagName === 'h1' ||
+              tagName === 'h2' ||
+              tagName === 'h3' ||
+              tagName === 'h4' ||
+              tagName === 'h5' ||
+              tagName === 'h6'
+                ? `\n## ${text}\n`
+                : tagName === 'p' || tagName === 'li'
+                  ? `${text}\n`
+                  : tagName === 'strong' || tagName === 'b'
+                    ? `**${text}** `
+                    : `${text} `;
+
+            textNodes.push(context);
+          } else {
+            textNodes.push(`${text} `);
+          }
+        }
+      }
+    }
+
+    // Combine all text with proper spacing
+    let fullText = textNodes.join(' ').replace(/\s+/g, ' ').replace(/\n\s+/g, '\n').trim();
+
+    // Log extraction for debugging
+    console.log('[A11y Extension] Extracted page content:', {
+      totalLength: fullText.length,
+      characterCount: fullText.length,
+      wordCount: fullText.split(/\s+/).length,
+      preview: fullText.slice(0, 200) + '...',
+    });
+
+    // For very long pages, we might need to chunk, but let's increase the limit significantly
+    // Most LLMs can handle 50k+ characters in context
+    // Limit to 50000 characters (approximately 10k words) to ensure we don't hit token limits
+    // This should capture most pages while still being reasonable
+    const MAX_LENGTH = 50000;
+
+    if (fullText.length > MAX_LENGTH) {
+      console.warn(
+        `[A11y Extension] Page content is very long (${fullText.length} chars), truncating to ${MAX_LENGTH} chars`,
+      );
+      // Prioritize: keep beginning and end (often most relevant)
+      const firstPart = fullText.slice(0, MAX_LENGTH * 0.6); // First 60%
+      const lastPart = fullText.slice(-MAX_LENGTH * 0.4); // Last 40%
+      fullText = firstPart + '\n\n[... content truncated ...]\n\n' + lastPart;
+    }
+
+    return fullText;
+  }, []);
+
+  /**
+   * Speak text using Web Speech API
+   */
+  const speakText = useCallback((text: string) => {
+    if (!text.trim()) return;
+
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    const pageLanguage = getPageLanguage();
+    utterance.lang = pageLanguage;
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    utterance.onstart = () => {
+      setIsSpeaking(true);
+      console.log('[A11y Extension] Speech synthesis started');
+    };
+
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      console.log('[A11y Extension] Speech synthesis ended');
+    };
+
+    utterance.onerror = (event: SpeechSynthesisErrorEvent) => {
+      setIsSpeaking(false);
+      console.error('[A11y Extension] Speech synthesis error:', event.error);
+      setError(`Speech synthesis error: ${event.error}`);
+    };
+
+    synthesisRef.current = window.speechSynthesis;
+    window.speechSynthesis.speak(utterance);
+  }, []);
+
+  /**
+   * Handle voice question - extract page content and send to LLM
+   */
+  const handleVoiceQuestion = useCallback(
+    async (question: string) => {
+      if (!question.trim() || isLoading) return;
+
+      setIsLoading(true);
+      setError('');
+      setResponse('');
+      setShowResponse(true);
+      setShowUI(false);
+      setActiveAction('ask');
+      setChatMessages([]);
+
+      try {
+        // Extract all visible page content
+        const pageContent = extractPageContent();
+        const pageContext = getPageContext();
+        const pageLanguage = getPageLanguage();
+        const languageName = getLanguageName(pageLanguage);
+
+        console.log('[A11y Extension] Extracted page content:', {
+          length: pageContent.length,
+          wordCount: pageContent.split(/\s+/).length,
+          preview: pageContent.slice(0, 300) + '...',
+        });
+
+        // Log the full content being sent (for debugging - can be removed in production)
+        console.log('[A11y Extension] Full page content being sent to LLM:', pageContent);
+
+        // Build prompt with page content - make it clear this is ALL visible content
+        const prompt = `You are an accessibility assistant helping users understand web content through voice interaction.
+
+The user is asking a question about a webpage. I have extracted ALL the visible text content from the webpage for you. Please read through it carefully to find the answer.
+
+Here is the complete visible content from the webpage:
+
+${pageContent}
+
+Additional context about the page:
+${pageContext}
+
+User's voice question: ${question}
+
+IMPORTANT: 
+- The page language is ${languageName} (${pageLanguage}). Please respond in ${languageName}.
+- The content above contains ALL visible text from the page. Please search through it carefully to find the answer.
+- If you find the answer, provide a clear, concise response (2-3 sentences maximum for voice output).
+- If the information is not in the content above, clearly state "I could not find this information on the page."
+- Be specific and mention where you found the information if relevant (e.g., "According to the page content..." or "The page mentions...").`;
+
+        let fullResponse = '';
+        for await (const chunk of streamPromptResponse(prompt, undefined, {
+          outputLanguage: pageLanguage,
+        })) {
+          fullResponse += chunk;
+          setResponse(fullResponse);
+        }
+
+        // Speak the response using text-to-speech
+        if (fullResponse.trim()) {
+          speakText(fullResponse);
+        }
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'An error occurred. Please try again.';
+        setError(errorMessage);
+        console.error('[A11y Extension] Voice question error:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isLoading, extractPageContent, speakText],
+  );
+
+  /**
+   * Handle voice control - start listening for user question
+   */
+  const handleVoiceControl = useCallback(() => {
+    if (isListening) {
+      // Stop listening
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+        recognitionRef.current = null;
+        setIsListening(false);
+      }
+      return;
+    }
+
+    // Check if Speech Recognition is available
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      setError('Speech Recognition is not supported in this browser');
+      return;
+    }
+
+    // Initialize speech recognition
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = getPageLanguage();
+
+    setIsListening(true);
+    setError('');
+
+    recognition.onstart = () => {
+      console.log('[A11y Extension] Speech recognition started');
+    };
+
+    recognition.onresult = async (event: SpeechRecognitionEvent) => {
+      const transcript = event.results[0][0].transcript;
+      console.log('[A11y Extension] Recognized speech:', transcript);
+
+      setIsListening(false);
+      recognitionRef.current = null;
+
+      // Process the voice question
+      await handleVoiceQuestion(transcript);
+    };
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      console.error('[A11y Extension] Speech recognition error:', event.error);
+      setIsListening(false);
+      recognitionRef.current = null;
+
+      if (event.error === 'no-speech') {
+        setError('No speech detected. Please try again.');
+      } else if (event.error === 'not-allowed') {
+        setError('Microphone access denied. Please allow microphone access.');
+      } else {
+        setError(`Speech recognition error: ${event.error}`);
+      }
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      recognitionRef.current = null;
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  }, [isListening, handleVoiceQuestion]);
 
   const handleSendQuestion = useCallback(async () => {
     if (!followUpInput.trim() || isLoading) return;
@@ -572,6 +951,27 @@ Please provide a helpful answer that considers the selected text and page contex
             title="Translate this text">
             Translate
           </button>
+          <button
+            onClick={e => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (typeof e.stopImmediatePropagation === 'function') {
+                e.stopImmediatePropagation();
+              }
+              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
+                e.nativeEvent.stopImmediatePropagation();
+              }
+              handleVoiceControl();
+            }}
+            disabled={isLoading || isSpeaking}
+            className={`rounded px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50 ${
+              isListening
+                ? 'animate-pulse bg-red-600 text-white hover:bg-red-700'
+                : 'text-indigo-600 hover:bg-indigo-50'
+            }`}
+            title={isListening ? 'Listening... Click to stop' : 'Voice control - Ask questions about the page'}>
+            {isListening ? '🎤 Listening...' : '🎤 Voice'}
+          </button>
         </div>
       )}
 
@@ -587,7 +987,7 @@ Please provide a helpful answer that considers the selected text and page contex
           <div className="flex items-center justify-between rounded-t-lg border-b border-gray-200 bg-gray-50 p-3">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-gray-700">
-                {activeAction === 'ask' && '💬 Quick Ask'}
+                {activeAction === 'ask' && (isSpeaking ? '🔊 Speaking...' : '💬 Quick Ask')}
                 {activeAction === 'summarize' && '📝 Summary'}
                 {activeAction === 'simplify' && '✨ Simplified'}
                 {activeAction === 'translate' && '🌐 Translation'}
@@ -610,12 +1010,26 @@ Please provide a helpful answer that considers the selected text and page contex
                 </select>
               )}
             </div>
-            <button
-              onClick={handleClose}
-              className="text-gray-400 transition-colors hover:text-gray-600"
-              aria-label="Close">
-              ✕
-            </button>
+            <div className="flex items-center gap-2">
+              {isSpeaking && (
+                <button
+                  onClick={() => {
+                    window.speechSynthesis.cancel();
+                    setIsSpeaking(false);
+                  }}
+                  className="text-gray-400 transition-colors hover:text-gray-600"
+                  aria-label="Stop speaking"
+                  title="Stop speaking">
+                  ⏸️
+                </button>
+              )}
+              <button
+                onClick={handleClose}
+                className="text-gray-400 transition-colors hover:text-gray-600"
+                aria-label="Close">
+                ✕
+              </button>
+            </div>
           </div>
 
           {/* Content */}
@@ -629,8 +1043,18 @@ Please provide a helpful answer that considers the selected text and page contex
             {/* Chat mode for "Ask" action */}
             {activeAction === 'ask' ? (
               <div className="space-y-3">
+                {/* Show voice question if from voice control */}
+                {chatMessages.length === 0 && !selectedText && isSpeaking && (
+                  <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 p-3">
+                    <div className="mb-2 text-xs font-semibold text-indigo-700">🎤 Voice Question:</div>
+                    <div className="text-sm text-indigo-900">
+                      {response ? 'Listening...' : 'Processing your voice question...'}
+                    </div>
+                  </div>
+                )}
+
                 {/* Show selected text context when no messages yet */}
-                {chatMessages.length === 0 && (
+                {chatMessages.length === 0 && selectedText && !isSpeaking && (
                   <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
                     <div className="mb-2 text-xs font-semibold text-blue-700">Selected text:</div>
                     <div className="text-sm text-blue-900">
