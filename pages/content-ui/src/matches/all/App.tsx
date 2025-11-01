@@ -1117,14 +1117,27 @@ IMPORTANT:
       style.textContent = `
         /* High Contrast Mode - WCAG AAA Compliant */
         
-        /* Force high contrast colors on all elements */
-        * {
+        /* Set page background */
+        html, body {
           background-color: #000000 !important;
+          color: #FFFF00 !important;
+        }
+
+        /* Force high contrast colors on content containers */
+        div, section, article, main, aside, footer, header, nav,
+        p, span, li, td, th, dd, dt, figcaption, caption,
+        h1, h2, h3, h4, h5, h6, a, label, legend {
+          background-color: transparent !important;
           color: #FFFF00 !important;
           border-color: #FFFF00 !important;
           outline-color: #FFFF00 !important;
           text-shadow: none !important;
           box-shadow: none !important;
+        }
+        
+        /* Ensure text elements are always visible */
+        p, span, div, h1, h2, h3, h4, h5, h6, li, td, th, a, label, strong, em, b, i, small, mark {
+          color: #FFFF00 !important;
         }
 
         /* Improve readability */
