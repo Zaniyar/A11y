@@ -1238,9 +1238,23 @@ IMPORTANT:
           visibility: visible !important;
         }
 
-        /* Navigation and menus */
-        nav, nav * {
+        /* Navigation and menus - fix positioning issues */
+        nav, nav *, .navbar, .navbar *, header, header * {
           font-size: max(18px, 1.2em) !important;
+        }
+
+        /* Override fixed/sticky positioning that can block content */
+        nav, .navbar, .nav, header, .header, 
+        .fixed, .sticky, .affix, 
+        [style*="position: fixed"], [style*="position:fixed"],
+        [style*="position: sticky"], [style*="position:sticky"] {
+          position: relative !important;
+          top: auto !important;
+          bottom: auto !important;
+          left: auto !important;
+          right: auto !important;
+          z-index: auto !important;
+          transform: none !important;
         }
         
         /* Ensure minimum touch target size (48x48px for WCAG AAA) */
