@@ -1384,6 +1384,123 @@ IMPORTANT:
     recognition.start();
   }, [isListening, handleVoiceQuestion]);
 
+  /**
+   * Handle follow-up voice input
+   */
+  const handleFollowUpVoice = useCallback(() => {
+    if (isListening) {
+      // Stop listening
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+        recognitionRef.current = null;
+        setIsListening(false);
+      }
+      return;
+    }
+
+    // Check if Speech Recognition is available
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      setError('Speech Recognition is not supported in this browser');
+      return;
+    }
+
+    // Initialize speech recognition
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = getPageLanguage();
+
+    setIsListening(true);
+    setError('');
+
+    recognition.onstart = () => {
+      console.log('[A11y Extension] Follow-up speech recognition started');
+    };
+
+    recognition.onresult = async (event: SpeechRecognitionEvent) => {
+      const transcript = event.results[0][0].transcript;
+      console.log('[A11y Extension] Recognized follow-up speech:', transcript);
+
+      setIsListening(false);
+      recognitionRef.current = null;
+
+      // Set the input and send the question directly
+      const trimmedTranscript = transcript.trim();
+      if (!trimmedTranscript) return;
+
+      // Add user message to chat
+      setChatMessages(prev => [...prev, { role: 'user', content: trimmedTranscript }]);
+      
+      setIsLoading(true);
+      setError('');
+
+      try {
+        const pageContext = getPageContext();
+        const pageLanguage = getPageLanguage();
+        const languageName = getLanguageName(pageLanguage);
+
+        // Build prompt with selected text context and previous messages
+        const previousMessages = chatMessages
+          .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
+          .join('\n\n');
+
+        const prompt = `You are an accessibility assistant helping users understand web content.
+
+The user has selected this text on a webpage:
+"${selectedText}"
+
+Context about the page:
+${pageContext}
+${previousMessages ? `\nPrevious conversation:\n${previousMessages}\n\n` : ''}User's question: ${trimmedTranscript}
+
+IMPORTANT: The page language is ${languageName} (${pageLanguage}). Please respond in ${languageName} unless the user explicitly asks you to respond in a different language.
+
+Please provide a helpful answer that considers the selected text and page context.`;
+
+        let fullResponse = '';
+        for await (const chunk of streamPromptResponse(prompt, undefined, {
+          outputLanguage: pageLanguage,
+        })) {
+          fullResponse += chunk;
+          setResponse(fullResponse);
+        }
+
+        // Add assistant response to chat
+        setChatMessages(prev => [...prev, { role: 'assistant', content: fullResponse }]);
+        setResponse(''); // Clear streaming response as it's now in chatMessages
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'An error occurred. Please try again.';
+        setError(errorMessage);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      console.error('[A11y Extension] Follow-up speech recognition error:', event.error);
+      setIsListening(false);
+      recognitionRef.current = null;
+
+      if (event.error === 'no-speech') {
+        setError('No speech detected. Please try again.');
+      } else if (event.error === 'not-allowed') {
+        setError('Microphone access denied. Please allow microphone access.');
+      } else {
+        setError(`Speech recognition error: ${event.error}`);
+      }
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      recognitionRef.current = null;
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  }, [isListening, selectedText, chatMessages]);
+
   const handleSendQuestion = useCallback(async () => {
     if (!followUpInput.trim() || isLoading) return;
 
@@ -1990,9 +2107,20 @@ Please provide a helpful answer that considers the selected text and page contex
                           ? 'Ask a question about the selected text...'
                           : 'Ask a follow-up question...'
                       }
-                      disabled={isLoading}
+                      disabled={isLoading || isListening}
                       className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
                     />
+                    <button
+                      onClick={handleFollowUpVoice}
+                      disabled={isLoading || isSpeaking}
+                      className={`rounded px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                        isListening
+                          ? 'animate-pulse bg-red-600 text-white hover:bg-red-700'
+                          : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                      }`}
+                      title={isListening ? 'Listening... Click to stop' : 'Ask by voice'}>
+                      {isListening ? '🎤 Listening...' : '🎤'}
+                    </button>
                     <button
                       onClick={handleSendQuestion}
                       disabled={!followUpInput.trim() || isLoading}
@@ -2000,7 +2128,9 @@ Please provide a helpful answer that considers the selected text and page contex
                       Send
                     </button>
                   </div>
-                  <p className="mt-1 text-xs text-gray-500">Press Enter to send</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {isListening ? 'Speak your question now...' : 'Press Enter to send or use 🎤 to speak'}
+                  </p>
                 </div>
               )}
 
