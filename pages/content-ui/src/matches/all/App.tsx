@@ -1452,27 +1452,50 @@ ${selectedText ? '- The user has SELECTED specific text (marked as "FOCUS TEXT" 
       setError('');
 
       try {
+        // Extract full page content for complete context
+        const pageContent = extractPageContent();
         const pageContext = getPageContext();
         const pageLanguage = getPageLanguage();
         const languageName = getLanguageName(pageLanguage);
 
-        // Build prompt with selected text context and previous messages
+        console.log('[A11y Extension] Voice follow-up question - extracted page content:', {
+          length: pageContent.length,
+          wordCount: pageContent.split(/\s+/).length,
+          hasSelectedText: !!selectedText,
+        });
+
+        // Build prompt with selected text context, FULL page content, and previous messages
         const previousMessages = chatMessages
           .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
           .join('\n\n');
 
-        const prompt = `You are an accessibility assistant helping users understand web content.
-
-The user has selected this text on a webpage:
+        // Include selected text as "focus" if available
+        const focusSection = selectedText 
+          ? `\n\n=== FOCUS TEXT (User Selected This) ===
 "${selectedText}"
+=== END FOCUS TEXT ===
 
-Context about the page:
+The user has specifically selected the text above. This is their PRIMARY FOCUS. However, you have access to the entire page content below to provide context and additional information.\n\n`
+          : '';
+
+        const prompt = `You are an accessibility assistant helping users understand web content through voice interaction.
+${focusSection}
+Here is the complete visible content from the webpage:
+
+${pageContent}
+
+Additional context about the page:
 ${pageContext}
-${previousMessages ? `\nPrevious conversation:\n${previousMessages}\n\n` : ''}User's question: ${trimmedTranscript}
+${previousMessages ? `\nPrevious conversation:\n${previousMessages}\n\n` : ''}
+User's voice question: ${trimmedTranscript}
 
-IMPORTANT: The page language is ${languageName} (${pageLanguage}). Please respond in ${languageName} unless the user explicitly asks you to respond in a different language.
-
-Please provide a helpful answer that considers the selected text and page context.`;
+IMPORTANT: 
+- The page language is ${languageName} (${pageLanguage}). Please respond in ${languageName}.
+${selectedText ? '- The user has SELECTED specific text (marked as "FOCUS TEXT" above). This is what they are primarily interested in, but use the full page content for additional context if needed.' : ''}
+- The content above contains ALL visible text from the page. Please search through it carefully to find the answer.
+- Provide a clear, concise response (2-3 sentences maximum for voice output).
+- If the information is not in the content above, clearly state "I could not find this information on the page."
+- Be specific and mention where you found the information if relevant.`;
 
         let fullResponse = '';
         for await (const chunk of streamPromptResponse(prompt, undefined, {
@@ -1485,6 +1508,11 @@ Please provide a helpful answer that considers the selected text and page contex
         // Add assistant response to chat
         setChatMessages(prev => [...prev, { role: 'assistant', content: fullResponse }]);
         setResponse(''); // Clear streaming response as it's now in chatMessages
+
+        // Speak the response using text-to-speech
+        if (fullResponse.trim()) {
+          speakText(fullResponse);
+        }
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : 'An error occurred. Please try again.';
         setError(errorMessage);
@@ -1514,7 +1542,7 @@ Please provide a helpful answer that considers the selected text and page contex
 
     recognitionRef.current = recognition;
     recognition.start();
-  }, [isListening, selectedText, chatMessages]);
+  }, [isListening, selectedText, chatMessages, extractPageContent, speakText]);
 
   const handleSendQuestion = useCallback(async () => {
     if (!followUpInput.trim() || isLoading) return;
@@ -1529,28 +1557,51 @@ Please provide a helpful answer that considers the selected text and page contex
     setError('');
 
     try {
+      // Extract full page content for complete context
+      const pageContent = extractPageContent();
       const pageContext = getPageContext();
       const pageLanguage = getPageLanguage();
       const languageName = getLanguageName(pageLanguage);
 
-      // Build prompt with selected text context
+      console.log('[A11y Extension] Follow-up question - extracted page content:', {
+        length: pageContent.length,
+        wordCount: pageContent.split(/\s+/).length,
+        hasSelectedText: !!selectedText,
+      });
+
+      // Build prompt with selected text context and FULL page content
       // Only include previous messages (excluding the current question which we'll add separately)
       const previousMessages = chatMessages
         .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
         .join('\n\n');
 
-      const prompt = `You are an accessibility assistant helping users understand web content.
-
-The user has selected this text on a webpage:
+      // Include selected text as "focus" if available
+      const focusSection = selectedText 
+        ? `\n\n=== FOCUS TEXT (User Selected This) ===
 "${selectedText}"
+=== END FOCUS TEXT ===
 
-Context about the page:
+The user has specifically selected the text above. This is their PRIMARY FOCUS. However, you have access to the entire page content below to provide context and additional information.\n\n`
+        : '';
+
+      const prompt = `You are an accessibility assistant helping users understand web content.
+${focusSection}
+Here is the complete visible content from the webpage:
+
+${pageContent}
+
+Additional context about the page:
 ${pageContext}
-${previousMessages ? `\nPrevious conversation:\n${previousMessages}\n\n` : ''}User's question: ${question}
+${previousMessages ? `\nPrevious conversation:\n${previousMessages}\n\n` : ''}
+User's question: ${question}
 
-IMPORTANT: The page language is ${languageName} (${pageLanguage}). Please respond in ${languageName} unless the user explicitly asks you to respond in a different language.
-
-Please provide a helpful answer that considers the selected text and page context.`;
+IMPORTANT: 
+- The page language is ${languageName} (${pageLanguage}). Please respond in ${languageName} unless the user explicitly asks you to respond in a different language.
+${selectedText ? '- The user has SELECTED specific text (marked as "FOCUS TEXT" above). This is what they are primarily interested in, but use the full page content for additional context if needed.' : ''}
+- The content above contains ALL visible text from the page. Please search through it carefully to find the answer.
+- Provide a clear, concise response (2-3 sentences maximum for voice output).
+- If the information is not in the content above, clearly state "I could not find this information on the page."
+- Be specific and mention where you found the information if relevant.`;
 
       let fullResponse = '';
       for await (const chunk of streamPromptResponse(prompt, undefined, {
@@ -1563,13 +1614,19 @@ Please provide a helpful answer that considers the selected text and page contex
       // Add assistant response to chat
       setChatMessages(prev => [...prev, { role: 'assistant', content: fullResponse }]);
       setResponse(''); // Clear streaming response as it's now in chatMessages
+
+      // Speak the response if there are previous messages (indicating we're in a conversation)
+      // This ensures follow-up responses are also spoken in voice mode
+      if (fullResponse.trim() && chatMessages.length > 0) {
+        speakText(fullResponse);
+      }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred. Please try again.';
       setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
-  }, [followUpInput, selectedText, chatMessages, isLoading]);
+  }, [followUpInput, selectedText, chatMessages, isLoading, extractPageContent, speakText]);
 
   // Update ref when showResponse changes
   useEffect(() => {
