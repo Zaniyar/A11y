@@ -1,275 +1,392 @@
 <div align="center">
 
-<picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/99cb6303-64e4-4bed-bf3f-35735353e6de" />
-    <source media="(prefers-color-scheme: light)" srcset="https://github.com/user-attachments/assets/a5dbf71c-c509-4c4f-80f4-be88a1943b0a" />
-    <img alt="Logo" src="https://github.com/user-attachments/assets/99cb6303-64e4-4bed-bf3f-35735353e6de" />
-</picture>
+# 🦾 A11y Copilot
+### Adaptive Accessibility for the Web
 
-![](https://img.shields.io/badge/React-61DAFB?style=flat-square&logo=react&logoColor=black)
-![](https://img.shields.io/badge/Typescript-3178C6?style=flat-square&logo=typescript&logoColor=white)
-![](https://badges.aleen42.com/src/vitejs.svg)
+**When "Disabled" Becomes Universal, Technology Must Adapt**
 
-![GitHub action badge](https://github.com/Jonghakseo/chrome-extension-boilerplate-react-vite/actions/workflows/build-zip.yml/badge.svg)
-![GitHub action badge](https://github.com/Jonghakseo/chrome-extension-boilerplate-react-vite/actions/workflows/lint.yml/badge.svg)
+[![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white)](https://chrome.google.com/webstore)
+[![Built with React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Chrome AI](https://img.shields.io/badge/Chrome_AI-Experimental-FF6B00?style=for-the-badge&logo=google&logoColor=white)](https://developer.chrome.com/docs/ai/built-in)
 
-<a href="https://discord.gg/4ERQ6jgV9a" target="_blank"><img src="https://discord.com/api/guilds/1263404974830915637/widget.png"/></a>
+*Barriers exist to be broken. Hands-free doesn't mean helpless. We all win when we design for everyone.*
 
-> This boilerplate
-> has [Legacy version](https://github.com/Jonghakseo/chrome-extension-boilerplate-react-vite/tree/legacy)
+[Features](#-features) • [Installation](#-installation) • [Usage](#-usage) • [APIs](#-apis-used) • [Documentation](#-documentation)
 
 </div>
 
-> [!NOTE]
-> This project is listed in the [Awesome Vite](https://github.com/vitejs/awesome-vite)
+---
 
-> [!TIP]
-> Share storage state between all pages
->
-> https://github.com/user-attachments/assets/3b8e189f-6443-490e-a455-4f9570267f8c
+## 🌟 The Vision
 
-## Table of Contents
+A11y Copilot transforms how **everyone** interacts with the web. Not just "disabled users"—because we're all temporarily or situationally disabled. The parent holding a baby. The developer with a sprained wrist. The student reading in their second language. The professional working late with eye strain.
 
-- [Intro](#intro)
-- [Features](#features)
-- [Structure](#structure)
-    - [ChromeExtension](#structure-chrome-extension)
-    - [Packages](#structure-packages)
-    - [Pages](#structure-pages)
-- [Installation](#installation)
-    - [Chrome](#installation-chrome)
-    - [Firefox](#installation-firefox)
-- [Install dependency](#install-dependency)
-    - [For root](#install-dependency-for-root)
-    - [For module](#install-dependency-for-module)
-- [Environment variables](#env-variables)
-    - [Add new](#env-variables-new)
-    - [Set via CLI](#env-variables-cli-set)
-- [Troubleshooting](#troubleshooting)
-    - [Hot module reload seems to have frozen](#hot-module-reload-seems-to-have-frozen)
-    - [Imports not resolving correctly](#imports-not-resolving-correctly)
-- [Community](#community)
-- [Debugging](#debugging)
-- [Reference](#reference)
-- [Star History](#star-history)
-- [Contributors](#contributors)
+**This isn't an accessibility tool. This is the future of web interaction.**
 
-## Intro
+## ✨ Features
 
-This boilerplate helps you create Chrome/Firefox extensions using React and Typescript. It improves
-the build speed and development experience by using Vite and Turborepo.
+### 🎯 Quick Ask AI
+Select any text on any webpage. Get five powerful actions instantly:
 
-## Features
+- **💬 Ask** - Chat with the page. Ask questions, get answers in context
+- **📝 Summarize** - Condense long articles into digestible summaries
+- **✏️ Simplify** - Rewrite complex language into clear, simple text
+- **🌐 Translate** - Instant translation to 75+ languages
+- **🎤 Voice** - Speak your questions, hear the answers
 
-- [React](https://reactjs.org/)
-- [TypeScript](https://www.typescriptlang.org/)
-- [Tailwindcss](https://tailwindcss.com/)
-- [Vite](https://vitejs.dev/) with [Rollup](https://rollupjs.org/)
-- [Turborepo](https://turbo.build/repo)
-- [Prettier](https://prettier.io/)
-- [ESLint](https://eslint.org/)
-- [Chrome Extensions Manifest Version 3](https://developer.chrome.com/docs/extensions/mv3/intro/)
-- [Custom i18n package](/packages/i18n/)
-- [Custom HMR (Hot Module Rebuild) plugin](/packages/hmr)
-- [End-to-end testing with WebdriverIO](https://webdriver.io/)
+### 👁️ Eye Control (Camera)
+**Zero hand movement required.**
+- Head-tracking mouse control using TrackyMouse
+- Small circular camera view (bottom-right corner)
+- Hover to click (dwell clicking)
+- Auto-scroll when near screen edges
+- Perfect for: Motor impairments, temporary injuries, hands-free browsing
 
-## Installation
+### 🎨 High Contrast Mode
+**One click for better visibility.**
+- WCAG AAA compliant (21:1 contrast ratio)
+- Yellow text on black background
+- Larger fonts and better spacing
+- Removes distracting animations
+- Fixes navigation bar coverage
 
-1. Clone this repository.( ```git clone https://github.com/Jonghakseo/chrome-extension-boilerplate-react-vite``` )
-2. Ensure your node version is >= than in `.nvmrc` file, recommend to use [nvm](https://github.com/nvm-sh/nvm?tab=readme-ov-file#intro)
-3. Edit `/packages/i18n/locales/`{your locale(s)}/`messages.json`
-4. In the objects `extensionDescription` and `extensionName`, change the `message` fields (leave `description` alone)
-5. Install pnpm globally: `npm install -g pnpm`
-6. Run `pnpm install`
-7. Check if you have that configuration in your IDE/Editor:
-    - <b>VS Code</b>:
-        - Installed [ESLint extension](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint)
-        - Installed [Prettier extension](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode)
-        - Enabled `Typescript Workbench version` in settings:
-            - CTRL + SHIFT + P -> Search: `Typescript: Select Typescript version...` -> `Use Workbench version`
-            - [Read more](https://code.visualstudio.com/docs/languages/typescript#_using-newer-typescript-versions)
-        - Optional, for imports to work correctly in WSL, you might need to install the [Remote - WSL](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-wsl) extension and connect to WSL remotely from VS Code. See overview section in the extension page for more information.
-    - <b>WebStorm</b>:
-      - Configured [ESLint](https://www.jetbrains.com/help/webstorm/eslint.html#ws_eslint_configure_run_eslint_on_save)
-      - Configured [Prettier](https://prettier.io/docs/en/webstorm.html)
-      - Optional, but useful `File | Settings | Tools | Actions on Save`\
-      -> `Optimize imports` and `Reformat code`
-8. Run `pnpm update-version <version>` for change the `version` to the desired version of your extension.
+### 🗣️ Voice Control
+**Completely hands-free interaction.**
+- Speak your questions (Speech Recognition)
+- Hear AI responses aloud (Text-to-Speech)
+- Follow-up questions with voice
+- Natural conversation flow
+- Supports multiple languages
 
-> [!IMPORTANT]
-> On Windows, make sure you have WSL enabled and Linux distribution (e.g. Ubuntu) installed on WSL.
-> 
-> [Installation Guide](https://learn.microsoft.com/en-us/windows/wsl/install)
+### 🎨 Beautiful UI
+- **Markdown rendering** with syntax highlighting
+- **Draggable dialogs** that never cover what you need
+- **Persistent chat history** for natural conversations
+- **Real-time streaming** responses
+- **Minimalist design** that's invisible until needed
 
-<b>Then, depending on the target browser:</b>
+## 🚀 Installation
 
-### For Chrome: <a name="installation-chrome"></a>
+### Prerequisites
+1. **Chrome/Chromium browser** (version 127+)
+2. **Enable Chrome AI APIs**:
+   - Navigate to `chrome://flags/#optimization-guide-on-device-model`
+   - Set to "Enabled BypassPerfRequirement"
+   - Navigate to `chrome://flags/#prompt-api-for-gemini-nano`
+   - Set to "Enabled"
+   - Restart Chrome
+3. **Download the AI model**:
+   - Open DevTools (F12) on any page
+   - Go to Console
+   - Type: `await ai.languageModel.create()`
+   - Wait for the model to download (may take a few minutes)
 
-1. Run:
-    - Dev: `pnpm dev` (on Windows, you should run as administrator;
-      see [issue#456](https://github.com/Jonghakseo/chrome-extension-boilerplate-react-vite/issues/456))
-    - Prod: `pnpm build`
-2. Open in browser - `chrome://extensions`
-3. Check - <kbd>Developer mode</kbd>
-4. Click - <kbd>Load unpacked</kbd> in the upper left corner
-5. Select the `dist` directory from the boilerplate project
+### Install the Extension
 
-### For Firefox: <a name="installation-firefox"></a>
+#### Option 1: Build from Source
+```bash
+# Clone the repository
+git clone git@github.com:Zaniyar/A11y.git
+cd A11y
 
-1. Run:
-    - Dev: `pnpm dev:firefox`
-    - Prod: `pnpm build:firefox`
-2. Open in browser - `about:debugging#/runtime/this-firefox`
-3. Click - <kbd>Load Temporary Add-on...</kbd> in the upper right corner
-4. Select the `./dist/manifest.json` file from the boilerplate project
+# Install dependencies
+npm install -g pnpm
+pnpm install
 
-> [!NOTE]
-> In Firefox, you load add-ons in temporary mode. That means they'll disappear after each browser close. You have to
-> load the add-on on every browser launch.
+# Build the extension
+pnpm build
 
-## Install dependency for turborepo: <a name="install-dependency"></a>
+# Load in Chrome
+# 1. Open chrome://extensions
+# 2. Enable "Developer mode"
+# 3. Click "Load unpacked"
+# 4. Select the 'dist' folder
+```
 
-### For root: <a name="install-dependency-for-root"></a>
+#### Option 2: Chrome Web Store (Coming Soon)
+*Extension pending review*
 
-1. Run `pnpm i <package> -w`
+### Grant Permissions
+When first using features, you'll be prompted to grant:
+- **Microphone** (for voice input)
+- **Camera** (for eye control)
 
-### For module: <a name="install-dependency-for-module"></a>
+These permissions are only requested when you use the respective features.
 
-1. Run `pnpm i <package> -F <module name>`
+## 🎮 Usage
 
-`package` - Name of the package you want to install e.g. `nodemon` \
-`module-name` - You can find it inside each `package.json` under the key `name`, e.g. `@extension/content-script`, you
-can use only `content-script` without `@extension/` prefix
+### Quick Ask AI
+1. **Select any text** on a webpage
+2. **Widget appears** with 5 buttons
+3. **Click an action**:
+   - 💬 **Ask**: Opens chat dialog, ask anything about the selected text
+   - 📝 **Summarize**: Get instant summary
+   - ✏️ **Simplify**: Get simplified version
+   - 🌐 **Translate**: Select language, get translation
+   - 🎤 **Voice**: Speak your question, hear the answer
 
-## How do I disable modules I'm not using?
+### Voice Mode
+1. **Select text** (optional)
+2. **Click 🎤 Voice button**
+3. **Speak your question**
+4. **Hear the answer** spoken aloud
+5. **Ask follow-ups** using text or voice
 
-[Read here](packages/module-manager/README.md)
+### Eye Control
+1. **Click 📷 Camera button** (next to Voice)
+2. **Allow camera access**
+3. **Calibrate** by looking at the screen
+4. **Move your head** to control cursor
+5. **Hover over buttons** to click automatically
+6. **Move near edges** to auto-scroll
 
-## Environment variables
+### High Contrast
+1. **Click ⚪ Contrast button**
+2. **Page transforms** to high contrast mode
+3. **Click again** to toggle off
 
-Read: [Env Documentation](packages/env/README.md)
+### Chat & Follow-ups
+1. **Ask initial question** (text or voice)
+2. **Type follow-up** in input field, or
+3. **Click 🎤** in input field to speak follow-up
+4. **AI remembers context** throughout conversation
+5. **Drag dialog header** to reposition if needed
 
-## Boilerplate structure <a name="structure"></a>
+## 🤖 APIs Used
 
-### Chrome extension <a name="structure-chrome-extension"></a>
+### Chrome Built-in AI (Experimental)
+- **Prompt API** - General AI conversations
+- **Summarizer API** - Text summarization
+- **Rewriter API** - Text simplification
+- **Translator API** - Language translation (75+ languages)
+- **Language Detector API** - Automatic language detection
 
-The extension lives in the `chrome-extension` directory and includes the following files:
+**Benefits**: Privacy-first (on-device), fast (no network), free, offline-capable
 
-- [`manifest.ts`](chrome-extension/manifest.ts) - script that outputs the `manifest.json`
-- [`src/background`](chrome-extension/src/background) - [background script](https://developer.chrome.com/docs/extensions/mv3/background_pages/)
-  (`background.service_worker` in manifest.json)
-- [`public`](chrome-extension/public/) - icons referenced in the manifest; content CSS for user's page injection
+### Web Speech API
+- **Speech Recognition** - Voice-to-text conversion
+- **Speech Synthesis** - Text-to-speech conversion
 
-> [!IMPORTANT]
-> To facilitate development, the boilerplate is configured to "Read and change all your data on all websites".
-> In production, it's best practice to limit the premissions to only the strictly necessary websites. See
-> [Declaring permissions](https://developer.chrome.com/docs/extensions/develop/concepts/declare-permissions)
-> and edit `manifest.js` accordingly.
+### TrackyMouse API
+- **Head tracking** with TensorFlow.js face mesh detection
+- **Dwell clicking** for hands-free interaction
 
-### Pages <a name="structure-pages"></a>
+### Chrome Extension APIs
+Content Scripts, Tabs, Storage, Runtime, Permissions
 
-Code that is transpiled to be part of the extension lives in the [pages](pages) directory.
+### Web Platform APIs
+DOM, TreeWalker, Computed Styles, Blob, postMessage
 
-- [`content`](pages/content) - Scripts injected into specified pages (You can see it in console)
-- [`content-ui`](pages/content-ui) - React Components injected into specified pages (You can see it at the very bottom of pages)
-- [`content-runtime`](pages/content-runtime/src/) - [injected content scripts](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts#functionality)
-  This can be injected from e.g. `popup` like standard `content`
-- [`devtools`](pages/devtools/) - [extend the browser DevTools](https://developer.chrome.com/docs/extensions/how-to/devtools/extend-devtools#creating)
-  (`devtools_page` in manifest.json)
-- [`devtools-panel`](pages/devtools-panel/) - [DevTools panel](https://developer.chrome.com/docs/extensions/reference/api/devtools/panels)
-  for [devtools](pages/devtools/src/index.ts)
-- [`new-tab`](pages/new-tab/) - [override the default New Tab page](https://developer.chrome.com/docs/extensions/develop/ui/override-chrome-pages)
-  (`chrome_url_overrides.newtab` in manifest.json)
-- [`options`](pages/options/) - [options page](https://developer.chrome.com/docs/extensions/develop/ui/options-page)
-  (`options_page` in manifest.json)
-- [`popup`](pages/popup/) - [popup](https://developer.chrome.com/docs/extensions/reference/api/action#popup) shown when
-  clicking the extension in the toolbar
-  (`action.default_popup` in manifest.json)
-- [`side-panel`](pages/side-panel/) - [sidepanel (Chrome 114+)](https://developer.chrome.com/docs/extensions/reference/api/sidePanel)
-  (`side_panel.default_path` in manifest.json)
+[📖 Full API Documentation](Hackathon.md#which-apis-did-you-use)
 
-### Packages <a name="structure-packages"></a>
+## 🏗️ Technical Architecture
 
-Some shared packages:
+### 3-Layer AI Integration
+```
+┌─────────────────────────────────────┐
+│     React UI Layer (TypeScript)     │  User Interface
+├─────────────────────────────────────┤
+│  Content Script Layer (Isolated)    │  Message Orchestration
+├─────────────────────────────────────┤
+│   Page Script Bridge (Page Context) │  Direct AI API Access
+└─────────────────────────────────────┘
+```
 
-- `dev-utils` - utilities for Chrome extension development (manifest-parser, logger)
-- `env` - exports object which contain all environment variables from `.env` and dynamically declared
-- `hmr` - custom HMR plugin for Vite, injection script for reload/refresh, HMR dev-server
-- `i18n` - custom internationalization package; provides i18n function with type safety and other validation
-- `shared` - shared code for the entire project (types, constants, custom hooks, components etc.)
-- `storage` - helpers for easier integration with [storage](https://developer.chrome.com/docs/extensions/reference/api/storage), e.g. local/session storages
-- `tailwind-config` - shared Tailwind config for entire project
-- `tsconfig` - shared tsconfig for the entire project
-- `ui` - function to merge your Tailwind config with the global one; you can save components here
-- `vite-config` - shared Vite config for the entire project
+### Key Technologies
+- **Frontend**: React 18 + TypeScript + Tailwind CSS
+- **Extension**: Chrome Manifest V3
+- **AI**: Chrome Built-in AI APIs (Origin Trial)
+- **Speech**: Web Speech API
+- **Eye Control**: TrackyMouse + TensorFlow.js
+- **Rendering**: react-markdown with custom components
+- **Build**: Vite + Turborepo + pnpm
 
-Other useful packages:
+### Advanced Features
+- Streaming responses with async generators
+- Full page content extraction with TreeWalker
+- Blob URL creation for Workers (CORS bypass)
+- Worker constructor monkey-patching
+- Drag-and-drop with viewport clamping
+- Auto-scroll with edge detection
+- CSP-compliant architecture
 
-- `zipper` - run `pnpm zip` to pack the `dist` folder into `extension-YYYYMMDD-HHmmss.zip` inside the newly created
-  `dist-zip`
-- `module-manager` - run `pnpm module-manager` to enable/disable modules
-- `e2e` - run `pnpm e2e` for end-to-end tests of your zipped extension on different browsers
+## 🎯 Who This Helps
 
-## Troubleshooting
+### Motor Disabilities
+- **Quadriplegia, cerebral palsy, ALS, muscular dystrophy**
+- Full hands-free web browsing with eye control
+- Voice-controlled navigation and interaction
 
-### Hot module reload seems to have frozen
+### Cognitive Challenges
+- **ADHD, dyslexia, autism, learning disabilities**
+- Text simplification for better comprehension
+- Summaries for information overload
+- Clear, structured responses
 
-If saving source files doesn't cause the extension HMR code to trigger a reload of the browser page, try this:
+### Visual Impairments
+- **Low vision, color blindness, eye strain**
+- High contrast mode (WCAG AAA)
+- Text-to-speech for all content
+- Larger, clearer typography
 
-1. Ctrl+C the development server and restart it (`pnpm run dev`)
-2. If you get a [`grpc` error](https://github.com/Jonghakseo/chrome-extension-boilerplate-react-vite/issues/612),
-   [kill the
-   `turbo` process](https://github.com/Jonghakseo/chrome-extension-boilerplate-react-vite/issues/612#issuecomment-2518982339)
-   and run `pnpm dev` again.
+### Language Barriers
+- **Non-native speakers, travelers, immigrants**
+- 75+ language translation
+- Automatic language detection
+- Context-aware translations
 
-### Imports not resolving correctly
+### Temporary Situations
+- **Broken arm, carpal tunnel, RSI, pregnancy**
+- Holding a baby, eating, multitasking
+- Eye strain from long reading sessions
+- Any time hands aren't free
 
-If you are using WSL and imports are not resolving correctly, ensure that you have connected VS Code to WSL remotely using the [Remote - WSL](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-wsl) extension.
+### Everyone
+Because clarity, simplicity, and convenience benefit **all of us**.
 
-## Community
+## 📚 Documentation
 
-To chat with other community members, you can join the [Discord](https://discord.gg/4ERQ6jgV9a) server.
-You can ask questions on that server, and you can also help others.
+- **[Hackathon Submission](Hackathon.md)** - Complete project story for hackathon judges
+- **[About the Project](ABOUT_THE_PROJECT.md)** - Deep dive into inspiration and journey
+- **[Prompt API Integration](PROMPT_API_INTEGRATION.md)** - Technical implementation guide
+- **[Plan & Todos](PLAN_TODOS.md)** - Development roadmap and task tracking
 
-Also, suggest new features or share any challenges you've faced while developing Chrome extensions!
+## 🔧 Development
 
-## Debugging
+### Setup
+```bash
+# Install dependencies
+pnpm install
 
-If you're debugging one, you can use [Brie](https://go.briehq.com/github?utm_source=CEB) lets you capture screenshots, errors, and network activity, making it easier for us to help.
+# Development mode (with HMR)
+pnpm dev
 
-## Reference
+# Build for production
+pnpm build
 
-- [Chrome Extensions](https://developer.chrome.com/docs/extensions)
-- [Vite Plugin](https://vitejs.dev/guide/api-plugin.html)
-- [Rollup](https://rollupjs.org/guide/en/)
-- [Turborepo](https://turbo.build/repo/docs)
-- [Rollup-plugin-chrome-extension](https://www.extend-chrome.dev/rollup-plugin)
+# Run linting
+pnpm lint
 
-## Star History <a name="star-history"></a>
+# Run tests
+pnpm test
+```
 
-<a href="https://star-history.com/#Jonghakseo/chrome-extension-boilerplate-react-vite&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Jonghakseo/chrome-extension-boilerplate-react-vite&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Jonghakseo/chrome-extension-boilerplate-react-vite&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Jonghakseo/chrome-extension-boilerplate-react-vite&type=Date" />
- </picture>
-</a>
+### Project Structure
+```
+A11y_Chrome/
+├── chrome-extension/        # Extension manifest and background scripts
+│   ├── manifest.ts         # Extension configuration
+│   ├── public/             # Static assets & bridge scripts
+│   └── src/background/     # Background service worker
+├── pages/                  # Extension pages
+│   ├── content-ui/         # React UI injected into pages
+│   ├── popup/              # Extension popup
+│   └── options/            # Settings page
+├── packages/               # Shared packages
+│   ├── shared/             # Shared utilities
+│   ├── storage/            # Storage helpers
+│   └── ui/                 # UI components
+└── dist/                   # Built extension
+```
 
-## Contributors <a name="contributors"></a>
+### Key Files
+- **[App.tsx](pages/content-ui/src/matches/all/App.tsx)** - Main UI component (2200+ lines)
+- **[ai-page-bridge.js](chrome-extension/public/ai-page-bridge.js)** - AI API bridge
+- **[tracky-mouse-bridge.js](chrome-extension/public/tracky-mouse-bridge.js)** - Eye control bridge
+- **[ai-services.ts](pages/content-ui/src/matches/all/ai-services.ts)** - AI service wrappers
 
-This Boilerplate is made possible thanks to all of its contributors.
+## 🚀 Roadmap
 
-<a href="https://github.com/Jonghakseo/chrome-extension-boilerplate-react-vite/graphs/contributors">
-  <img width="500px" src="https://contrib.rocks/image?repo=Jonghakseo/chrome-extension-boilerplate-react-vite" alt="All Contributors"/>
-</a>
+### Immediate (v1.1)
+- [ ] Enhanced eye control calibration
+- [ ] Custom voice commands
+- [ ] Keyboard shortcuts for all features
+- [ ] Save and export conversations
+- [ ] Reading mode with optimized typography
+
+### Near Future (v1.5)
+- [ ] Firefox extension
+- [ ] Context awareness (remember preferences)
+- [ ] Multi-page learning
+- [ ] Proactive translation
+- [ ] Custom simplification levels
+
+### Long Term (v2.0)
+- [ ] Mobile support (iOS/Android)
+- [ ] Screen reader integration
+- [ ] Switch control for single-button navigation
+- [ ] Braille display output
+- [ ] Developer API for third-party integration
+
+### Research & Innovation
+- [ ] AI model fine-tuning for accessibility
+- [ ] Gaze prediction
+- [ ] Emotion detection for adaptive tone
+- [ ] Multimodal input (voice + eye + gesture)
+- [ ] Neural interface support
+
+[View Full Roadmap →](Hackathon.md#whats-next-for-a11y-copilot-adaptive-accessibility-for-the-web)
+
+## 🤝 Contributing
+
+We welcome contributions! Whether you're:
+- Fixing bugs
+- Adding features
+- Improving documentation
+- Sharing feedback
+- Testing with assistive technologies
+
+### How to Contribute
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'feat: Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### Code of Conduct
+We're committed to providing a welcoming and inclusive environment. Please read our Code of Conduct before contributing.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🌟 Acknowledgments
+
+### Technologies
+- **Chrome Built-in AI** team for pioneering on-device AI
+- **TrackyMouse** for open-source head tracking
+- **React** and **Vite** teams for amazing developer tools
+
+### Inspiration
+- **WHO ICF** (International Classification of Functioning)
+- **W3C WAI** (Web Accessibility Initiative)
+- **WCAG** (Web Content Accessibility Guidelines)
+- Everyone who advocates for universal design
+
+### Special Thanks
+To everyone who believes that **barriers exist to be broken** and **we all win when we design for everyone**.
+
+## 💬 Contact & Support
+
+- **Issues**: [GitHub Issues](https://github.com/Zaniyar/A11y/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/Zaniyar/A11y/discussions)
+- **Email**: [Your contact email]
+
+## ⭐ Star History
+
+If this project helps you, please consider giving it a star! ⭐
+
+It helps others discover the project and motivates us to keep improving it.
 
 ---
 
-## Special Thanks To
+<div align="center">
 
-| <a href="https://jb.gg/OpenSourceSupport"><img width="40" src="https://resources.jetbrains.com/storage/products/company/brand/logos/jb_beam.png" alt="JetBrains Logo (Main) logo."></a> | <a href="https://www.linkedin.com/in/j-acks0n"><img width="40" style="border-radius:50%" src='https://avatars.githubusercontent.com/u/23139754' alt='Jackson Hong'/></a> |
-|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+**Built with ❤️ for everyone, everywhere, always.**
 
----
+*"Accessibility isn't charity—it's empathy."*
 
-Made by [Jonghakseo](https://jonghakseo.github.io/)
+[⬆ Back to Top](#-a11y-copilot)
+
+</div>
