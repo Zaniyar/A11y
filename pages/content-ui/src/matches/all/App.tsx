@@ -299,8 +299,10 @@ export default function App() {
   /**
    * Handle translation - performs actual translation with selected language
    */
-  const handleTranslate = useCallback(async () => {
-    if (!selectedText || isLoading || !targetLanguage) return;
+  const handleTranslate = useCallback(async (language?: string) => {
+    // Use provided language or fall back to state
+    const langToUse = language || targetLanguage;
+    if (!selectedText || isLoading || !langToUse) return;
 
     setIsLoading(true);
     setError('');
@@ -308,20 +310,20 @@ export default function App() {
 
     try {
       const pageLanguage = getPageLanguage();
-      const targetLangName = getLanguageName(targetLanguage);
+      const targetLangName = getLanguageName(langToUse);
 
       if (!aiSupport?.hasTranslator) {
         // Fallback to Prompt API
-        const prompt = `Translate the following text to ${targetLangName} (${targetLanguage}).
+        const prompt = `Translate the following text to ${targetLangName} (${langToUse}).
 
 Text to translate:
 "${selectedText}"
 
-IMPORTANT: Please provide ONLY the translation in ${targetLangName} (${targetLanguage}). Do not add explanations or additional text.`;
+IMPORTANT: Please provide ONLY the translation in ${targetLangName} (${langToUse}). Do not add explanations or additional text.`;
 
         let fullResponse = '';
         for await (const chunk of streamPromptResponse(prompt, undefined, {
-          outputLanguage: targetLanguage,
+          outputLanguage: langToUse,
         })) {
           fullResponse += chunk;
           setResponse(fullResponse);
@@ -331,23 +333,23 @@ IMPORTANT: Please provide ONLY the translation in ${targetLangName} (${targetLan
 
       try {
         // Detect language and translate to target language
-        const translated = await translateText(selectedText, targetLanguage);
+        const translated = await translateText(selectedText, langToUse);
         setResponse(translated);
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
         // If Translator API fails due to unsupported language pair, fallback to Prompt API
         if (errorMessage.includes('language') || errorMessage.includes('not supported') || errorMessage.includes('Unable to create translator')) {
           console.warn('[A11y Extension] Translator API language pair not supported, using Prompt API fallback');
-          const prompt = `Translate the following text to ${targetLangName} (${targetLanguage}).
+          const prompt = `Translate the following text to ${targetLangName} (${langToUse}).
 
 Text to translate:
 "${selectedText}"
 
-IMPORTANT: Please provide ONLY the translation in ${targetLangName} (${targetLanguage}). Do not add explanations or additional text.`;
+IMPORTANT: Please provide ONLY the translation in ${targetLangName} (${langToUse}). Do not add explanations or additional text.`;
 
           let fullResponse = '';
           for await (const chunk of streamPromptResponse(prompt, undefined, {
-            outputLanguage: targetLanguage,
+            outputLanguage: langToUse,
           })) {
             fullResponse += chunk;
             setResponse(fullResponse);
@@ -1432,9 +1434,12 @@ Please provide a helpful answer that considers the selected text and page contex
                 <select
                   value={targetLanguage}
                   onChange={e => {
-                    setTargetLanguage(e.target.value);
-                    // Trigger translation when language changes
-                    setTimeout(() => handleTranslate(), 0);
+                    const selectedLang = e.target.value;
+                    setTargetLanguage(selectedLang);
+                    // Trigger translation immediately with the selected language
+                    if (selectedLang) {
+                      handleTranslate(selectedLang);
+                    }
                   }}
                   className="rounded border border-gray-300 px-2 py-1 text-xs"
                   disabled={isLoading}>
