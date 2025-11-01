@@ -1,5 +1,87 @@
 # A11y Copilot: Adaptive Accessibility for the Web
 
+## What problem is your submission addressing?
+
+**The web is inaccessible to millions, and it's getting worse.**
+
+### The Problem (In Numbers):
+- **1.3 billion people** (16% of global population) experience significant disability
+- **2.2 billion people** have vision impairment or blindness
+- **466 million people** have disabling hearing loss
+- **Millions more** face temporary or situational disabilities daily
+
+### The Real-World Impact:
+
+**1. Information Overload & Cognitive Barriers**
+- Complex language makes content inaccessible to people with cognitive disabilities, non-native speakers, and those with limited literacy
+- Long articles overwhelm people with ADHD, dyslexia, or limited time
+- Dense legal/academic documents exclude millions who need the information most
+
+**2. Motor Impairment Exclusion**
+- People with quadriplegia, cerebral palsy, ALS, or muscular dystrophy **cannot use traditional mouse/keyboard**
+- Temporary injuries (broken arms, carpal tunnel) make web browsing painful or impossible
+- Situational constraints (holding a baby, eating, multitasking) limit interaction
+
+**3. Language Barriers**
+- 75% of internet users don't speak English as their first language
+- Critical information (health, legal, education) remains inaccessible across language boundaries
+- Automatic translation tools lack context and accuracy
+
+**4. Visual Accessibility Gaps**
+- Low contrast, small fonts, and poor color choices exclude people with low vision
+- Color blindness affects 1 in 12 men and 1 in 200 women
+- Eye strain from prolonged reading affects everyone
+
+**5. The "Situational Disability" Everyone Faces**
+- You break your arm → can't type
+- You're holding groceries → hands aren't free
+- You're in a loud environment → can't hear audio
+- You're driving → can't look at screen
+- You're tired → complex text becomes impenetrable
+
+### Why Existing Solutions Fall Short:
+
+**Screen Readers**: Excellent for blind users, but:
+- Steep learning curve
+- Don't simplify complex content
+- Can't translate or summarize
+- Require dedicated software
+
+**Browser Translation**: Basic but:
+- Loses context and nuance
+- Doesn't understand content structure
+- Can't answer questions or explain
+- Often produces awkward results
+
+**Text-to-Speech Tools**: Help with reading, but:
+- Don't simplify language
+- Can't answer questions
+- No interaction or conversation
+- Limited language support
+
+**Accessibility Overlays**: Often criticized as:
+- Band-aids on broken websites
+- Not addressing root causes
+- Sometimes making things worse
+- Limited functionality
+
+### The Core Problem We're Solving:
+
+**The web was designed for able-bodied, English-speaking users with perfect vision, full motor control, and unlimited cognitive capacity. That's not reality.**
+
+We need a solution that:
+- ✅ Makes complex content simple **on-demand**
+- ✅ Enables **hands-free** web browsing
+- ✅ **Translates** with context awareness
+- ✅ Answers questions about content **interactively**
+- ✅ Works **on any website** without website changes
+- ✅ Adapts to **every user's needs**
+- ✅ Is **invisible** until needed
+- ✅ Respects **privacy** (on-device AI)
+- ✅ Is **free** and accessible to all
+
+**That's what A11y Copilot does.**
+
 ## Inspiration
 
 The spark came from a simple but profound realization: **accessibility isn't a minority issue—it's a human one.**
