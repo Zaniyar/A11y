@@ -124,6 +124,119 @@ Building A11y Copilot meant solving problems that don't have documented solution
 - Ensures yellow text on black background
 - Removes animations and shadows
 
+## Which APIs did you use?
+
+We leverage multiple cutting-edge APIs to create a seamless accessibility experience:
+
+### 🤖 Chrome Built-in AI APIs (Experimental - Origin Trial)
+**The core of our intelligence layer:**
+
+1. **Prompt API** (`window.ai.languageModel`)
+   - General-purpose AI conversations
+   - Context-aware question answering
+   - Natural language understanding
+   - Used for: Ask feature, voice questions, follow-up conversations
+   - Supports: Output language specification, system prompts, temperature control
+
+2. **Summarizer API** (`window.ai.summarizer`)
+   - Specialized summarization of long text
+   - Adjustable length (short, medium, long)
+   - Context preservation
+   - Used for: Summarize feature
+   - Supports: Format specification (plain-text, markdown)
+
+3. **Rewriter API** (`window.ai.rewriter`)
+   - Text simplification and rewriting
+   - Tone adjustment (plain, formal, casual)
+   - Length control (shorter, longer, same)
+   - Used for: Simplify feature
+   - Supports: Context-aware simplification
+
+4. **Translator API** (`window.ai.translator`)
+   - Real-time translation
+   - Automatic source language detection
+   - 75+ target languages supported
+   - Used for: Translate feature
+   - Supports: Streaming translations
+
+5. **Language Detector API** (`window.ai.languageDetector`)
+   - Automatic language detection
+   - Confidence scoring
+   - Used for: Automatic source language detection in translations
+
+**Why Chrome Built-in AI?**
+- **Privacy-first**: All processing happens locally on-device
+- **Fast**: No network latency, instant responses
+- **Free**: No API keys or subscription fees
+- **Offline-capable**: Works without internet connection
+- **Streaming**: Real-time response generation
+
+### 🎤 Web Speech API
+**For voice interaction:**
+
+1. **Speech Recognition API** (`window.SpeechRecognition` / `window.webkitSpeechRecognition`)
+   - Voice-to-text conversion
+   - Continuous and interim results
+   - Language-specific recognition
+   - Used for: Voice mode, follow-up voice questions
+   - Features: Multiple language support, confidence scoring
+
+2. **Speech Synthesis API** (`window.speechSynthesis`)
+   - Text-to-speech conversion
+   - Multiple voices and languages
+   - Rate, pitch, and volume control
+   - Used for: Speaking AI responses aloud
+   - Features: Natural-sounding voices, language-specific pronunciation
+
+### 👁️ TrackyMouse API
+**For hands-free navigation:**
+
+- **Head Tracking**: Uses device camera and machine learning for head movement detection
+- **Face Mesh Detection**: TensorFlow.js-based facial landmark detection
+- **Dwell Clicking**: Automatic clicking when hovering over interactive elements
+- **Pointer Control**: Converts head movements to cursor movements
+- Used for: Camera button (eye control) feature
+- Features: Calibration, sensitivity adjustment, dwell time configuration
+
+### 🔧 Chrome Extension APIs
+**For extension functionality:**
+
+1. **Content Scripts API**: Inject scripts into web pages
+2. **Tabs API**: Manage browser tabs and windows
+3. **Storage API**: Persist user preferences and settings
+4. **Runtime API**: Message passing between extension components
+5. **Permissions API**: Request necessary permissions (camera, microphone)
+
+### 🎨 Web Platform APIs
+**For UI and interaction:**
+
+1. **DOM APIs**: Content extraction, element manipulation
+2. **TreeWalker API**: Efficient DOM traversal for content extraction
+3. **Computed Styles API**: Visibility detection for content filtering
+4. **Intersection Observer API**: Viewport visibility detection
+5. **Blob API**: Worker script loading via Blob URLs
+6. **postMessage API**: Cross-context communication
+
+### 📦 Third-Party Libraries (Not APIs, but key dependencies)
+
+- **React**: UI framework
+- **react-markdown**: Markdown rendering for AI responses
+- **Tailwind CSS**: Utility-first styling
+- **TypeScript**: Type-safe development
+- **Vite**: Build tool and dev server
+
+## API Integration Challenges
+
+**Origin Trial Access**: Chrome Built-in AI APIs are experimental and require Origin Trial tokens. We had to inject tokens at `document_start` to ensure proper API activation.
+
+**Isolated Contexts**: Extension content scripts run in isolated contexts, separate from the page. We built a bridge architecture to enable API access from content scripts.
+
+**Streaming Responses**: AI APIs return streaming generators. We implemented async iteration with `for await` loops to handle real-time updates.
+
+**Language Support**: Not all AI APIs support all languages. We built fallback systems (e.g., Translator API → Prompt API for unsupported language pairs).
+
+**Web Worker CORS**: TrackyMouse uses Web Workers that can't load from `chrome-extension://` URLs. We created Blob URLs and monkey-patched the Worker constructor as a workaround.
+
 ## Challenges we ran into
 
 ### Challenge 1: Origin Trial Tokens and Timing
