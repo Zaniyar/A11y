@@ -785,16 +785,30 @@ IMPORTANT: The page language is ${languageName} (${pageLanguage}). Please provid
           length: pageContent.length,
           wordCount: pageContent.split(/\s+/).length,
           preview: pageContent.slice(0, 300) + '...',
+          hasSelectedText: !!selectedText,
+          selectedTextLength: selectedText?.length || 0,
         });
 
         // Log the full content being sent (for debugging - can be removed in production)
         console.log('[A11y Extension] Full page content being sent to LLM:', pageContent);
+        if (selectedText) {
+          console.log('[A11y Extension] Focus text (selected):', selectedText);
+        }
 
         // Build prompt with page content - make it clear this is ALL visible content
+        // Include selected text as "focus" if available
+        const focusSection = selectedText 
+          ? `\n\n=== FOCUS TEXT (User Selected This) ===
+"${selectedText}"
+=== END FOCUS TEXT ===
+
+The user has specifically selected the text above. This is their PRIMARY FOCUS. However, you have access to the entire page content below to provide context and additional information.\n\n`
+          : '';
+
         const prompt = `You are an accessibility assistant helping users understand web content through voice interaction.
 
 The user is asking a question about a webpage. I have extracted ALL the visible text content from the webpage for you. Please read through it carefully to find the answer.
-
+${focusSection}
 Here is the complete visible content from the webpage:
 
 ${pageContent}
@@ -806,6 +820,7 @@ User's voice question: ${question}
 
 IMPORTANT: 
 - The page language is ${languageName} (${pageLanguage}). Please respond in ${languageName}.
+${selectedText ? '- The user has SELECTED specific text (marked as "FOCUS TEXT" above). This is what they are primarily interested in, but use the full page content for additional context if needed.' : ''}
 - The content above contains ALL visible text from the page. Please search through it carefully to find the answer.
 - If you find the answer, provide a clear, concise response (2-3 sentences maximum for voice output).
 - If the information is not in the content above, clearly state "I could not find this information on the page."
@@ -835,7 +850,7 @@ IMPORTANT:
         setIsLoading(false);
       }
     },
-    [isLoading, extractPageContent, speakText],
+    [isLoading, extractPageContent, speakText, selectedText],
   );
 
   /**
