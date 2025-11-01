@@ -296,6 +296,74 @@ export default function App() {
     };
   }, []);
 
+  /**
+   * Handle translation - performs actual translation with selected language
+   */
+  const handleTranslate = useCallback(async () => {
+    if (!selectedText || isLoading || !targetLanguage) return;
+
+    setIsLoading(true);
+    setError('');
+    setResponse('');
+
+    try {
+      const pageLanguage = getPageLanguage();
+      const targetLangName = getLanguageName(targetLanguage);
+
+      if (!aiSupport?.hasTranslator) {
+        // Fallback to Prompt API
+        const prompt = `Translate the following text to ${targetLangName} (${targetLanguage}).
+
+Text to translate:
+"${selectedText}"
+
+IMPORTANT: Please provide ONLY the translation in ${targetLangName} (${targetLanguage}). Do not add explanations or additional text.`;
+
+        let fullResponse = '';
+        for await (const chunk of streamPromptResponse(prompt, undefined, {
+          outputLanguage: targetLanguage,
+        })) {
+          fullResponse += chunk;
+          setResponse(fullResponse);
+        }
+        return;
+      }
+
+      try {
+        // Detect language and translate to target language
+        const translated = await translateText(selectedText, targetLanguage);
+        setResponse(translated);
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        // If Translator API fails due to unsupported language pair, fallback to Prompt API
+        if (errorMessage.includes('language') || errorMessage.includes('not supported') || errorMessage.includes('Unable to create translator')) {
+          console.warn('[A11y Extension] Translator API language pair not supported, using Prompt API fallback');
+          const prompt = `Translate the following text to ${targetLangName} (${targetLanguage}).
+
+Text to translate:
+"${selectedText}"
+
+IMPORTANT: Please provide ONLY the translation in ${targetLangName} (${targetLanguage}). Do not add explanations or additional text.`;
+
+          let fullResponse = '';
+          for await (const chunk of streamPromptResponse(prompt, undefined, {
+            outputLanguage: targetLanguage,
+          })) {
+            fullResponse += chunk;
+            setResponse(fullResponse);
+          }
+        } else {
+          setError(errorMessage);
+        }
+      }
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred. Please try again.';
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedText, isLoading, targetLanguage, aiSupport]);
+
   const handleAction = useCallback(
     async (action: ActionType, e?: React.MouseEvent) => {
       // Prevent event propagation to avoid triggering click-outside handlers
@@ -313,7 +381,6 @@ export default function App() {
       }
 
       if (!selectedText || isLoading) return;
-      if (action === 'translate' && !targetLanguage) return;
 
       // For "Ask" action, just show the UI and wait for user's question
       if (action === 'ask') {
@@ -329,6 +396,20 @@ export default function App() {
         showResponseRef.current = true;
         console.log('[A11y Extension] Chat popup state set, showResponse:', true);
         return; // Don't send prompt yet, wait for user to type question
+      }
+
+      // For "Translate" action, just show the UI and wait for user to select language
+      if (action === 'translate') {
+        console.log('[A11y Extension] Translate button clicked, showing language selector');
+        setActiveAction(action);
+        setError('');
+        setResponse('');
+        setTargetLanguage(''); // Reset language selection
+        setShowResponse(true);
+        setShowUI(false);
+        // Update ref immediately so click-outside handler knows popup is open
+        showResponseRef.current = true;
+        return; // Don't translate yet, wait for user to select language
       }
 
       setIsLoading(true);
@@ -450,58 +531,6 @@ IMPORTANT: The page language is ${languageName} (${pageLanguage}). Please provid
             break;
           }
 
-          case 'translate': {
-            const pageLanguage = getPageLanguage();
-            const targetLangName = getLanguageName(targetLanguage);
-
-            if (!aiSupport?.hasTranslator) {
-              // Fallback to Prompt API
-              const prompt = `Translate the following text to ${targetLangName} (${targetLanguage}).
-
-Text to translate:
-"${selectedText}"
-
-IMPORTANT: Please provide ONLY the translation in ${targetLangName} (${targetLanguage}). Do not add explanations or additional text.`;
-
-              let fullResponse = '';
-              for await (const chunk of streamPromptResponse(prompt, undefined, {
-                outputLanguage: targetLanguage,
-              })) {
-                fullResponse += chunk;
-                setResponse(fullResponse);
-              }
-              break;
-            }
-
-            try {
-              // Detect language and translate to target language
-              const translated = await translateText(selectedText, targetLanguage);
-              setResponse(translated);
-            } catch (err: unknown) {
-              const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-              // If Translator API fails due to unsupported language pair, fallback to Prompt API
-              if (errorMessage.includes('language') || errorMessage.includes('not supported') || errorMessage.includes('Unable to create translator')) {
-                console.warn('[A11y Extension] Translator API language pair not supported, using Prompt API fallback');
-                const prompt = `Translate the following text to ${targetLangName} (${targetLanguage}).
-
-Text to translate:
-"${selectedText}"
-
-IMPORTANT: Please provide ONLY the translation in ${targetLangName} (${targetLanguage}). Do not add explanations or additional text.`;
-
-                let fullResponse = '';
-                for await (const chunk of streamPromptResponse(prompt, undefined, {
-                  outputLanguage: targetLanguage,
-                })) {
-                  fullResponse += chunk;
-                  setResponse(fullResponse);
-                }
-              } else {
-                setError(errorMessage);
-              }
-            }
-            break;
-          }
         }
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : 'An error occurred. Please try again.';
@@ -1402,9 +1431,14 @@ Please provide a helpful answer that considers the selected text and page contex
               {activeAction === 'translate' && (
                 <select
                   value={targetLanguage}
-                  onChange={e => setTargetLanguage(e.target.value)}
+                  onChange={e => {
+                    setTargetLanguage(e.target.value);
+                    // Trigger translation when language changes
+                    setTimeout(() => handleTranslate(), 0);
+                  }}
                   className="rounded border border-gray-300 px-2 py-1 text-xs"
                   disabled={isLoading}>
+                  <option value="">Select language...</option>
                   <option value="en">English</option>
                   <option value="es">Spanish</option>
                   <option value="fr">French</option>
@@ -1604,6 +1638,18 @@ Please provide a helpful answer that considers the selected text and page contex
             ) : (
               <>
                 {/* Non-chat mode (Summarize, Simplify, Translate) */}
+                {/* Show language selection prompt for translate when no language selected */}
+                {activeAction === 'translate' && !targetLanguage && !isLoading && !response && (
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-center">
+                    <p className="mb-2 text-sm font-medium text-blue-800">
+                      👆 Select a language from the dropdown above to begin translation
+                    </p>
+                    <p className="text-xs text-blue-600">
+                      The translation will start automatically when you select a language
+                    </p>
+                  </div>
+                )}
+
                 {isLoading && !response && (
                   <div className="flex items-center gap-2 text-gray-500">
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600"></div>
