@@ -750,6 +750,10 @@ IMPORTANT:
           setResponse(fullResponse);
         }
 
+        // Add the response to chat messages so it persists while speaking
+        setChatMessages([{ role: 'assistant', content: fullResponse }]);
+        setResponse(''); // Clear streaming response as it's now in chatMessages
+
         // Speak the response using text-to-speech
         if (fullResponse.trim()) {
           speakText(fullResponse);
