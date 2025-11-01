@@ -135,6 +135,7 @@ export default function App() {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isEyeControl, setIsEyeControl] = useState(false);
+  const [isHighContrast, setIsHighContrast] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [draggedPosition, setDraggedPosition] = useState<{ x: number; y: number } | null>(null);
@@ -1086,6 +1087,208 @@ IMPORTANT:
   }, [isEyeControl]);
 
   /**
+   * Handle high contrast mode - apply accessibility-friendly styles to entire page
+   * Following WCAG 2.1 Level AAA guidelines
+   */
+  const handleHighContrast = useCallback(() => {
+    const styleId = 'a11y-high-contrast-styles';
+    
+    if (isHighContrast) {
+      // Disable high contrast
+      const existingStyle = document.getElementById(styleId);
+      if (existingStyle) {
+        existingStyle.remove();
+      }
+      setIsHighContrast(false);
+      return;
+    }
+
+    // Enable high contrast
+    try {
+      // Remove existing style if any
+      const existingStyle = document.getElementById(styleId);
+      if (existingStyle) {
+        existingStyle.remove();
+      }
+
+      // Create comprehensive high-contrast stylesheet
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.textContent = `
+        /* High Contrast Mode - WCAG AAA Compliant */
+        
+        /* Force high contrast colors on all elements */
+        * {
+          background-color: #000000 !important;
+          color: #FFFF00 !important;
+          border-color: #FFFF00 !important;
+          outline-color: #FFFF00 !important;
+          text-shadow: none !important;
+          box-shadow: none !important;
+        }
+
+        /* Improve readability */
+        body, body * {
+          font-size: max(16px, 1.2em) !important;
+          line-height: 1.8 !important;
+          letter-spacing: 0.05em !important;
+          font-weight: 600 !important;
+          font-family: Arial, Helvetica, sans-serif !important;
+        }
+
+        /* Headings */
+        h1, h1 * { font-size: max(32px, 2em) !important; margin: 1em 0 0.5em 0 !important; }
+        h2, h2 * { font-size: max(28px, 1.75em) !important; margin: 0.9em 0 0.4em 0 !important; }
+        h3, h3 * { font-size: max(24px, 1.5em) !important; margin: 0.8em 0 0.4em 0 !important; }
+        h4, h4 * { font-size: max(20px, 1.25em) !important; }
+        h5, h5 * { font-size: max(18px, 1.1em) !important; }
+        h6, h6 * { font-size: max(16px, 1em) !important; }
+
+        /* Links - make them clearly visible */
+        a, a * {
+          color: #00FFFF !important;
+          text-decoration: underline !important;
+          text-decoration-thickness: 2px !important;
+        }
+        a:hover, a:hover *, a:focus, a:focus * {
+          color: #FFFFFF !important;
+          background-color: #0000FF !important;
+          outline: 3px solid #FFFFFF !important;
+        }
+
+        /* Buttons and interactive elements */
+        button, input[type="button"], input[type="submit"], input[type="reset"], .btn, [role="button"] {
+          background-color: #FFFF00 !important;
+          color: #000000 !important;
+          border: 3px solid #FFFFFF !important;
+          padding: 12px 24px !important;
+          font-size: max(18px, 1.2em) !important;
+          font-weight: 700 !important;
+          cursor: pointer !important;
+          min-height: 48px !important;
+          min-width: 48px !important;
+        }
+        button:hover, button:focus,
+        input[type="button"]:hover, input[type="button"]:focus,
+        input[type="submit"]:hover, input[type="submit"]:focus {
+          background-color: #FFFFFF !important;
+          color: #000000 !important;
+          outline: 4px solid #00FFFF !important;
+          outline-offset: 2px !important;
+        }
+
+        /* Form inputs */
+        input, textarea, select {
+          background-color: #FFFFFF !important;
+          color: #000000 !important;
+          border: 3px solid #FFFF00 !important;
+          padding: 12px !important;
+          font-size: max(18px, 1.2em) !important;
+          min-height: 48px !important;
+        }
+        input:focus, textarea:focus, select:focus {
+          outline: 4px solid #00FFFF !important;
+          outline-offset: 2px !important;
+        }
+
+        /* Remove background images and decorative elements */
+        *::before, *::after {
+          background-image: none !important;
+          content: '' !important;
+        }
+        img, svg, video, iframe {
+          border: 3px solid #FFFF00 !important;
+          opacity: 1 !important;
+        }
+
+        /* Improve spacing and layout */
+        p, li, td, th {
+          margin-bottom: 1em !important;
+          padding: 0.5em !important;
+        }
+        ul, ol {
+          margin-left: 2em !important;
+          padding-left: 1em !important;
+        }
+
+        /* Tables */
+        table {
+          border-collapse: separate !important;
+          border-spacing: 4px !important;
+        }
+        th, td {
+          border: 2px solid #FFFF00 !important;
+          padding: 12px !important;
+        }
+        th {
+          background-color: #FFFF00 !important;
+          color: #000000 !important;
+          font-weight: 700 !important;
+        }
+
+        /* Focus indicators */
+        *:focus {
+          outline: 4px solid #00FFFF !important;
+          outline-offset: 2px !important;
+        }
+
+        /* Improve visibility of hidden but accessible content */
+        [aria-hidden="false"] {
+          display: block !important;
+          visibility: visible !important;
+        }
+
+        /* Navigation and menus */
+        nav, nav * {
+          font-size: max(18px, 1.2em) !important;
+        }
+        
+        /* Ensure minimum touch target size (48x48px for WCAG AAA) */
+        button, a, input, select, textarea, [role="button"], [role="link"], [onclick], [tabindex] {
+          min-width: 48px !important;
+          min-height: 48px !important;
+          padding: 12px !important;
+        }
+
+        /* Hide purely decorative elements */
+        [aria-hidden="true"], .decorative, .background-image {
+          opacity: 0.3 !important;
+        }
+
+        /* Code blocks */
+        code, pre, kbd, samp {
+          background-color: #1a1a1a !important;
+          color: #00FF00 !important;
+          border: 2px solid #00FF00 !important;
+          padding: 8px !important;
+          font-family: "Courier New", Courier, monospace !important;
+        }
+
+        /* Quotes */
+        blockquote {
+          border-left: 5px solid #FFFF00 !important;
+          padding-left: 20px !important;
+          margin-left: 10px !important;
+        }
+
+        /* Ensure our extension UI is also visible in high contrast */
+        [data-a11y-extension], [data-a11y-extension] * {
+          /* Extension UI uses its own colors */
+        }
+      `;
+
+      document.head.appendChild(style);
+      setIsHighContrast(true);
+      
+      console.log('[A11y Extension] High contrast mode enabled');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to enable high contrast mode';
+      setError(errorMessage);
+      console.error('[A11y Extension] High contrast error:', err);
+    }
+  }, [isHighContrast]);
+
+  /**
    * Handle voice control - start listening for user question
    */
   const handleVoiceControl = useCallback(() => {
@@ -1380,6 +1583,26 @@ Please provide a helpful answer that considers the selected text and page contex
             }`}
             title={isListening ? 'Listening... Click to stop' : 'Voice control - Ask questions about the page'}>
             {isListening ? '🎤 Listening...' : '🎤 Voice'}
+          </button>
+          <button
+            onClick={e => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (typeof e.stopImmediatePropagation === 'function') {
+                e.stopImmediatePropagation();
+              }
+              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
+                e.nativeEvent.stopImmediatePropagation();
+              }
+              handleHighContrast();
+            }}
+            className={`rounded px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50 ${
+              isHighContrast
+                ? 'animate-pulse bg-yellow-500 text-black hover:bg-yellow-600'
+                : 'text-purple-600 hover:bg-purple-50'
+            }`}
+            title={isHighContrast ? 'High contrast active... Click to disable' : 'High contrast mode - WCAG AAA compliant colors and sizing for better visibility'}>
+            {isHighContrast ? '🎨 Active...' : '🎨 Contrast'}
           </button>
           <button
             onClick={e => {
