@@ -451,8 +451,25 @@ IMPORTANT: The page language is ${languageName} (${pageLanguage}). Please provid
           }
 
           case 'translate': {
+            const pageLanguage = getPageLanguage();
+            const targetLangName = getLanguageName(targetLanguage);
+
             if (!aiSupport?.hasTranslator) {
-              setError('Translator API is not available');
+              // Fallback to Prompt API
+              const prompt = `Translate the following text to ${targetLangName} (${targetLanguage}).
+
+Text to translate:
+"${selectedText}"
+
+IMPORTANT: Please provide ONLY the translation in ${targetLangName} (${targetLanguage}). Do not add explanations or additional text.`;
+
+              let fullResponse = '';
+              for await (const chunk of streamPromptResponse(prompt, undefined, {
+                outputLanguage: targetLanguage,
+              })) {
+                fullResponse += chunk;
+                setResponse(fullResponse);
+              }
               break;
             }
 
@@ -461,7 +478,27 @@ IMPORTANT: The page language is ${languageName} (${pageLanguage}). Please provid
               const translated = await translateText(selectedText, targetLanguage);
               setResponse(translated);
             } catch (err: unknown) {
-              setError(err instanceof Error ? err.message : 'Translation failed');
+              const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+              // If Translator API fails due to unsupported language pair, fallback to Prompt API
+              if (errorMessage.includes('language') || errorMessage.includes('not supported') || errorMessage.includes('Unable to create translator')) {
+                console.warn('[A11y Extension] Translator API language pair not supported, using Prompt API fallback');
+                const prompt = `Translate the following text to ${targetLangName} (${targetLanguage}).
+
+Text to translate:
+"${selectedText}"
+
+IMPORTANT: Please provide ONLY the translation in ${targetLangName} (${targetLanguage}). Do not add explanations or additional text.`;
+
+                let fullResponse = '';
+                for await (const chunk of streamPromptResponse(prompt, undefined, {
+                  outputLanguage: targetLanguage,
+                })) {
+                  fullResponse += chunk;
+                  setResponse(fullResponse);
+                }
+              } else {
+                setError(errorMessage);
+              }
             }
             break;
           }
